@@ -297,9 +297,9 @@
         confirmPasswordInput.addEventListener('input', checkPasswordMatch);
         passwordInput.addEventListener('input', checkPasswordMatch);
 
-        // Form submission
-        document.getElementById('signupForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+         // Supabase Signup
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
 
             const password = passwordInput.value;
             const confirmPassword = confirmPasswordInput.value;
@@ -311,37 +311,39 @@
             }
 
             // Get form data
-            const fullName = document.getElementById('fullName').value;
-            const username = document.getElementById('username').value;
-            const email = document.getElementById('email').value;
-            const currency = document.getElementById('currency').value;
+        const fullName = document.getElementById('fullName').value;
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+        const currency = document.getElementById('currency').value;
 
-            // Store user data (in a real app, this would go to a backend)
-            const userData = {
-                fullName: fullName,
-                username: username,
-                email: email,
-                currency: currency,
-                createdAt: new Date().toISOString()
-            };
+            // Sign up with Supabase
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    fullName: fullName,
+                    username: username,
+                    currency: currency
+                }
+            }
+        });
 
-            localStorage.setItem('userMode', 'user');
-            localStorage.setItem('userData', JSON.stringify(userData));
-            localStorage.setItem('userName', fullName);
-            localStorage.setItem('userEmail', email);
-            localStorage.setItem('userCurrency', currency);
-
-            // Show success message
-            alert('Account created successfully! ✨');
+        if (error) {
+            alert(error.message);
+        } else {
+            alert('Account created! Please check your email to confirm before logging in.');
+            window.location.href = 'login.html';
+        }
+    });
 
             // Redirect to dashboard
             window.location.href = 'dashboard.html';
-        });
 
         // Username validation - only allow letters, numbers, underscores
-        document.getElementById('username').addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
-        });
-    </script>
+    document.getElementById('username').addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
+    });
+</script>
 </body>
 </html>

@@ -304,7 +304,7 @@
             <div class="logo-icon">🎁</div>
             <h1>Whatdyawant?</h1>
         </div>
-** Change Welcome Text to something cooler **
+<!-- Change Welcome Text to something cooler -->
         <div class="welcome-text">
             <h2>Welcome!</h2>
             <p>Sign in to manage your wishlist</p>
@@ -330,83 +330,38 @@
             <span>OR</span>
         </div>
 
-        <button class="btn btn-secondary" onclick="showGuestModal()">
-            Continue as Guest
-        </button>
-
         <p class="link-text">
             Don't have an account? <a href="signup.html">Sign Up</a>
         </p>
     </div>
 
-    <!-- Guest Mode Modal -->
-    <div id="guestModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>⚠️ Guest Mode</h3>
-                <p>Limited access - consider creating an account</p>
-            </div>
-
-            <div>
-                <p style="margin-bottom: 12px; font-weight: 600; color: #111827;">As a guest you CAN:</p>
-                <ul class="modal-list can-do">
-                    <li>✓ View wishlists</li>
-                    <li>✓ Claim items on others' lists</li>
-                </ul>
-
-                <p style="margin: 20px 0 12px; font-weight: 600; color: #111827;">But you CANNOT:</p>
-                <ul class="modal-list cannot-do">
-                    <li>✗ Unclaim items later</li>
-                    <li>✗ Save lists for future reference</li>
-                    <li>✗ View your claimed items</li>
-                    <li>✗ Create your own wishlist</li>
-                </ul>
-            </div>
-
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="hideGuestModal()">
-                    Go Back
-                </button>
-                <button class="btn btn-primary" onclick="continueAsGuest()">
-                    Continue Anyway
-                </button>
-            </div>
-        </div>
-    </div>
 
     <script>
-        // Modal functions
-        function showGuestModal() {
-            document.getElementById('guestModal').classList.add('active');
-        }
-
-        function hideGuestModal() {
-            document.getElementById('guestModal').classList.remove('active');
-        }
-
-        function continueAsGuest() {
-            // Store guest mode
-            localStorage.setItem('userMode', 'guest');
-            window.location.href = 'friends-wishlists.html';
-        }
 
         // Login form submission
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // For now, just simulate login (you'll add real authentication later)
-            const email = document.getElementById('email').value;
-            
-            // Store logged in state
-            localStorage.setItem('userMode', 'user');
-            localStorage.setItem('userEmail', email);
-            localStorage.setItem('userName', email.split('@')[0]);
-            
-            // Redirect to dashboard
-            window.location.href = 'dashboard.html';
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        // Use Supabase authentication
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
         });
 
+        if (error) {
+            // Show error to user
+            alert(error.message);
+        } else {
+            // Successful login, redirect to dashboard
+            window.location.href = 'dashboard.html';
+        }
+    });
+
         // Close modal when clicking outside
+        <!--Check if this still works after supabase connection-->
         document.getElementById('guestModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 hideGuestModal();
