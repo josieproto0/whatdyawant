@@ -1,3 +1,4 @@
+<script src="https://skixfenlotxgocdoqxrx.supabase.co"></script>
 
 import { createClient } from '@supabase/supabase-js'
 
