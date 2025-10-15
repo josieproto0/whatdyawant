@@ -454,48 +454,50 @@
     </main>
 
     <script>
-        // Load user data
-        window.addEventListener('DOMContentLoaded', function() {
-            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-            const userName = localStorage.getItem('userName') || 'User';
-            const userEmail = localStorage.getItem('userEmail') || 'user@email.com';
+                // Load user data from Supabase
+        window.addEventListener('DOMContentLoaded', async function() {
+            const { data: { user }, error } = await supabase.auth.getUser();
 
-            document.getElementById('userName').textContent = userData.fullName || userName;
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const userMeta = user.user_metadata || {};
+            const fullName = userMeta.fullName || user.email.split('@')[0];
+            const username = userMeta.username || user.email.split('@')[0];
+            const userEmail = user.email;
+
+            // Set Avatar and Share Link 
+            document.getElementById('userName').textContent = fullName;
             document.getElementById('userEmail').textContent = userEmail;
-            
-            // Set avatar initial
-            const initial = (userData.fullName || userName)[0].toUpperCase();
-            document.getElementById('userAvatar').textContent = initial;
-
-            // Generate share link based on username
-            const username = userData.username || userName.toLowerCase().replace(/\s+/g, '');
+            document.getElementById('userAvatar').textContent = fullName[0].toUpperCase();
             document.getElementById('shareLink').value = `https://whatdyawant.app/list/${username}`;
         });
 
         // Toggle sidebar on mobile
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
+    function toggleSidebar() {  
+    document.getElementById('sidebar').classList.toggle('active');
+}
 
         // Copy share link
         function copyShareLink() {
             const shareLink = document.getElementById('shareLink');
             shareLink.select();
             shareLink.setSelectionRange(0, 99999); // For mobile
-            
+
             navigator.clipboard.writeText(shareLink.value).then(function() {
                 alert('✓ Link copied to clipboard!');
             }).catch(function() {
-                // Fallback for older browsers
                 document.execCommand('copy');
                 alert('✓ Link copied to clipboard!');
             });
         }
 
         // Logout function
-        function logout() {
+        async function logout() {
             if (confirm('Are you sure you want to logout?')) {
-                localStorage.clear();
+                await supabase.auth.signOut();
                 window.location.href = 'login.html';
             }
         }
@@ -504,13 +506,13 @@
         document.addEventListener('click', function(e) {
             const sidebar = document.getElementById('sidebar');
             const menuBtn = document.querySelector('.mobile-menu-btn');
-            
+
             if (window.innerWidth <= 768) {
                 if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
                     sidebar.classList.remove('active');
                 }
             }
         });
-    </script>
+        </script>
 </body>
 </html>
