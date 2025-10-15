@@ -10,6 +10,6 @@
   <body>
     <h1>Whatdyawant</h1>
     <h2>Wishlist App building</h2>
-    <p><a href="[/login](https://josieproto0.github.io/whatdyawant/login)">Enter App</a></p>
+    <p><a href="https://josieproto0.github.io/whatdyawant/login">Enter App</a></p>
   </body>
 </html>
