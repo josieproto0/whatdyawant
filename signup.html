@@ -270,53 +270,53 @@
     </div>
 
     <script>
-        const passwordInput = document.getElementById('password');
-        const confirmPasswordInput = document.getElementById('confirmPassword');
-        const passwordMatch = document.getElementById('passwordMatch');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const passwordMatch = document.getElementById('passwordMatch');
 
-        // Check password match in real-time
-        function checkPasswordMatch() {
-            const password = passwordInput.value;
-            const confirmPassword = confirmPasswordInput.value;
+    // Check password match in real-time
+    function checkPasswordMatch() {
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
 
-            if (confirmPassword === '') {
-                passwordMatch.className = 'password-match';
-                passwordMatch.textContent = '';
-                return;
-            }
-
-            if (password === confirmPassword) {
-                passwordMatch.className = 'password-match success';
-                passwordMatch.textContent = '✓ Passwords match';
-            } else {
-                passwordMatch.className = 'password-match error';
-                passwordMatch.textContent = '✗ Passwords do not match';
-            }
+        if (confirmPassword === '') {
+            passwordMatch.className = 'password-match';
+            passwordMatch.textContent = '';
+            return;
         }
 
-        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
-        passwordInput.addEventListener('input', checkPasswordMatch);
+        if (password === confirmPassword) {
+            passwordMatch.className = 'password-match success';
+            passwordMatch.textContent = '✓ Passwords match';
+        } else {
+            passwordMatch.className = 'password-match error';
+            passwordMatch.textContent = '✗ Passwords do not match';
+        }
+    }
 
-         // Supabase Signup
-        document.getElementById('signupForm').addEventListener('submit', async function(e) {
-          e.preventDefault();
+    confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+    passwordInput.addEventListener('input', checkPasswordMatch);
 
-            const password = passwordInput.value;
-            const confirmPassword = confirmPasswordInput.value;
+    // Supabase Signup
+    document.getElementById('signupForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
 
-            // Validate passwords match
-            if (password !== confirmPassword) {
-                alert('Passwords do not match!');
-                return;
-            }
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
 
-            // Get form data
+        // Validate passwords match
+        if (password !== confirmPassword) {
+            alert('Passwords do not match!');
+            return;
+        }
+
+        // Get form data
         const fullName = document.getElementById('fullName').value;
         const username = document.getElementById('username').value;
         const email = document.getElementById('email').value;
         const currency = document.getElementById('currency').value;
 
-            // Sign up with Supabase
+        // Supabase signup call!
         const { data, error } = await supabase.auth.signUp({
             email: email,
             password: password,
@@ -331,16 +331,15 @@
 
         if (error) {
             alert(error.message);
+            console.log(error);
         } else {
             alert('Account created! Please check your email to confirm before logging in.');
+            console.log(data); // For debugging
             window.location.href = 'login.html';
         }
     });
 
-            // Redirect to dashboard
-            window.location.href = 'dashboard.html';
-
-        // Username validation - only allow letters, numbers, underscores
+    // Username validation - only allow letters, numbers, underscores
     document.getElementById('username').addEventListener('input', function(e) {
         this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
     });
