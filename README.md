@@ -1,2 +1,14 @@
-# whatdyawant
-Wishlist App building
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta 
+      name="description"
+      content="Landing Page Whatdyawant App"/>
+  </head>
+  <body>
+    <h1>Whatdyawant</h1>
+    <h2>Wishlist App building</h2>
+  </body>
+</html>
