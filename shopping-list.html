@@ -566,190 +566,239 @@
         <div id="shoppingListContainer"></div>
     </main>
 
-    <script>
-        let claimedItems = [];
+     <script>
+            let claimedItems = [];
+            let currentUserId = null;
+            let currentProfile = null;
 
-        // Load user data and shopping list
-        window.addEventListener('DOMContentLoaded', function() {
-            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-            const userName = localStorage.getItem('userName') || 'User';
-            const userEmail = localStorage.getItem('userEmail') || 'user@email.com';
-
-            document.getElementById('userName').textContent = userData.fullName || userName;
-            document.getElementById('userEmail').textContent = userEmail;
-            
-            const initial = (userData.fullName || userName)[0].toUpperCase();
-            document.getElementById('userAvatar').textContent = initial;
-
-            loadShoppingList();
-        });
-
-        function loadShoppingList() {
-            claimedItems = JSON.parse(localStorage.getItem('claimedItems') || '[]');
-            renderShoppingList();
-        }
-
-        function renderShoppingList() {
-            const container = document.getElementById('shoppingListContainer');
-            const budgetCard = document.getElementById('budgetCard');
-
-            if (claimedItems.length === 0) {
-                budgetCard.style.display = 'none';
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🛍️</div>
-                        <h3>Your shopping list is empty</h3>
-                        <p>Start claiming items from your friends' wishlists to build your shopping list and track your gift budget!</p>
-                        <a href="friends-wishlists.html" class="btn-primary">
-                            Browse Friends' Wishlists
-                        </a>
-                    </div>
-                `;
-                return;
-            }
-
-            // Show budget card
-            budgetCard.style.display = 'block';
-            updateBudgetCard();
-
-            // Group items by friend
-            const groupedByFriend = {};
-            claimedItems.forEach(item => {
-                if (!groupedByFriend[item.friendUsername]) {
-                    groupedByFriend[item.friendUsername] = {
-                        name: item.friendName,
-                        username: item.friendUsername,
-                        items: []
-                    };
+            // Load user data and shopping list
+            window.addEventListener('DOMContentLoaded', async function() {
+                // Get current user from Supabase Auth
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    window.location.href = 'login.html';
+                    return;
                 }
-                groupedByFriend[item.friendUsername].items.push(item);
+                currentUserId = user.id;
+
+                // Load profile from public.profiles
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', currentUserId)
+                    .single();
+
+                if (error || !profile) {
+                    alert("Couldn't load profile info.");
+                    return;
+                }
+                currentProfile = profile;
+
+                // Update sidebar
+                document.getElementById('userName').textContent = profile.full_name || user.email.split('@')[0];
+                document.getElementById('userEmail').textContent = user.email;
+                const initial = (profile.full_name || user.email)[0].toUpperCase();
+                document.getElementById('userAvatar').textContent = initial;
+
+                // Fetch claimed items from Supabase (shopping list)
+                await loadShoppingList();
             });
 
-            // Render sections
-            container.innerHTML = Object.values(groupedByFriend).map(friend => {
-                const friendTotal = friend.items.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
-                
-                return `
-                    <div class="friend-section">
-                        <div class="friend-section-header">
-                            <div class="friend-section-title">
-                                <div class="friend-avatar-small">${friend.name[0].toUpperCase()}</div>
-                                <h3>For ${friend.name}</h3>
-                            </div>
-                            <div class="section-total">${getCurrencySymbol()}${friendTotal.toFixed(2)}</div>
+            async function loadShoppingList() {
+                // Get claimed items for this user
+                const { data: claims, error } = await supabase
+                    .from('claims')
+                    .select('item_id, friend_user_id, purchased')
+                    .eq('claimed_by', currentUserId);
+
+                // Get wishlist item details for claimed items
+                claimedItems = [];
+                if (claims && claims.length > 0) {
+                    for (const claim of claims) {
+                        // Get wishlist item details
+                        const { data: itemData } = await supabase
+                            .from('wishlist_items')
+                            .select('id, name, price, link')
+                            .eq('id', claim.item_id)
+                            .single();
+
+                        // Get friend's profile info for grouping
+                        const { data: friendProfile } = await supabase
+                            .from('profiles')
+                            .select('username, full_name')
+                            .eq('id', claim.friend_user_id)
+                            .single();
+
+                        claimedItems.push({
+                            itemId: claim.item_id,
+                            itemName: itemData?.name || 'Unknown',
+                            itemPrice: itemData?.price || 0,
+                            itemLink: itemData?.link || '',
+                            friendUsername: friendProfile?.username || '',
+                            friendName: friendProfile?.full_name || friendProfile?.username || '',
+                            purchased: claim.purchased || false,
+                        });
+                    }
+                }
+                renderShoppingList();
+            }
+
+            function renderShoppingList() {
+                const container = document.getElementById('shoppingListContainer');
+                const budgetCard = document.getElementById('budgetCard');
+
+                if (claimedItems.length === 0) {
+                    budgetCard.style.display = 'none';
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🛍️</div>
+                            <h3>Your shopping list is empty</h3>
+                            <p>Start claiming items from your friends' wishlists to build your shopping list and track your gift budget!</p>
+                            <a href="friends-wishlists.html" class="btn-primary">
+                                Browse Friends' Wishlists
+                            </a>
                         </div>
-                        
-                        <div class="items-list">
-                            ${friend.items.map((item, index) => `
-                                <div class="shopping-item ${item.purchased ? 'purchased' : ''}" data-item-id="${item.itemId}">
-                                    <div class="item-checkbox">
-                                        <div class="checkbox-wrapper">
-                                            <input 
-                                                type="checkbox" 
-                                                ${item.purchased ? 'checked' : ''}
-                                                onchange="togglePurchased(${item.itemId}, '${friend.username}')"
-                                            >
+                    `;
+                    return;
+                }
+
+                // Show budget card
+                budgetCard.style.display = 'block';
+                updateBudgetCard();
+
+                // Group items by friend
+                const groupedByFriend = {};
+                claimedItems.forEach(item => {
+                    if (!groupedByFriend[item.friendUsername]) {
+                        groupedByFriend[item.friendUsername] = {
+                            name: item.friendName,
+                            username: item.friendUsername,
+                            items: []
+                        };
+                    }
+                    groupedByFriend[item.friendUsername].items.push(item);
+                });
+
+                // Render sections
+                container.innerHTML = Object.values(groupedByFriend).map(friend => {
+                    const friendTotal = friend.items.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
+
+                    return `
+                        <div class="friend-section">
+                            <div class="friend-section-header">
+                                <div class="friend-section-title">
+                                    <div class="friend-avatar-small">${friend.name[0].toUpperCase()}</div>
+                                    <h3>For ${friend.name}</h3>
+                                </div>
+                                <div class="section-total">${getCurrencySymbol()}${friendTotal.toFixed(2)}</div>
+                            </div>
+                            
+                            <div class="items-list">
+                                ${friend.items.map((item, index) => `
+                                    <div class="shopping-item ${item.purchased ? 'purchased' : ''}" data-item-id="${item.itemId}">
+                                        <div class="item-checkbox">
+                                            <div class="checkbox-wrapper">
+                                                <input 
+                                                    type="checkbox" 
+                                                    ${item.purchased ? 'checked' : ''}
+                                                    onchange="togglePurchased('${item.itemId}', '${friend.username}')"
+                                                >
+                                            </div>
+                                        </div>
+                                        <div class="item-info">
+                                            <div class="item-name">${item.itemName}</div>
+                                            ${item.itemLink ? `<a href="${item.itemLink}" class="item-link" target="_blank">🔗 View on ${friend.name}'s wishlist</a>` : ''}
+                                        </div>
+                                        <div class="item-price">${getCurrencySymbol()}${(item.itemPrice || 0).toFixed(2)}</div>
+                                        <div class="item-actions">
+                                            <button class="btn-unclaim" onclick="unclaimItem('${item.itemId}', '${friend.username}')">
+                                                Unclaim
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="item-info">
-                                        <div class="item-name">${item.itemName}</div>
-                                        <a href="#" class="item-link" onclick="viewWishlist('${friend.username}'); return false;">
-                                            🔗 View on ${friend.name}'s wishlist
-                                        </a>
-                                    </div>
-                                    <div class="item-price">${getCurrencySymbol()}${(item.itemPrice || 0).toFixed(2)}</div>
-                                    <div class="item-actions">
-                                        <button class="btn-unclaim" onclick="unclaimItem(${item.itemId}, '${friend.username}')">
-                                            Unclaim
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
+                                `).join('')}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateBudgetCard() {
-            const totalSpend = claimedItems.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
-            const totalItems = claimedItems.length;
-            const purchasedItems = claimedItems.filter(item => item.purchased).length;
-            const remainingItems = totalItems - purchasedItems;
-
-            document.getElementById('totalSpend').textContent = `${getCurrencySymbol()}${totalSpend.toFixed(2)}`;
-            document.getElementById('totalItemsCount').textContent = totalItems;
-            document.getElementById('purchasedCount').textContent = purchasedItems;
-            document.getElementById('remainingCount').textContent = remainingItems;
-        }
-
-        function getCurrencySymbol() {
-            const currency = localStorage.getItem('userCurrency') || 'GBP';
-            const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
-            return symbols[currency] || '$';
-        }
-
-        function togglePurchased(itemId, friendUsername) {
-            const itemIndex = claimedItems.findIndex(i => i.itemId === itemId && i.friendUsername === friendUsername);
-            if (itemIndex >= 0) {
-                claimedItems[itemIndex].purchased = !claimedItems[itemIndex].purchased;
-                localStorage.setItem('claimedItems', JSON.stringify(claimedItems));
-                renderShoppingList();
+                    `;
+                }).join('');
             }
-        }
 
-        function unclaimItem(itemId, friendUsername) {
-            const item = claimedItems.find(i => i.itemId === itemId && i.friendUsername === friendUsername);
-            if (confirm(`Unclaim "${item.itemName}"? It will become available for others to claim.`)) {
-                claimedItems = claimedItems.filter(i => !(i.itemId === itemId && i.friendUsername === friendUsername));
-                localStorage.setItem('claimedItems', JSON.stringify(claimedItems));
-                
-                // Update friend's stats
-                updateFriendStats(friendUsername);
-                
-                renderShoppingList();
-                alert('✓ Item unclaimed');
+            function updateBudgetCard() {
+                const totalSpend = claimedItems.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
+                const totalItems = claimedItems.length;
+                const purchasedItems = claimedItems.filter(item => item.purchased).length;
+                const remainingItems = totalItems - purchasedItems;
+
+                document.getElementById('totalSpend').textContent = `${getCurrencySymbol()}${totalSpend.toFixed(2)}`;
+                document.getElementById('totalItemsCount').textContent = totalItems;
+                document.getElementById('purchasedCount').textContent = purchasedItems;
+                document.getElementById('remainingCount').textContent = remainingItems;
             }
-        }
 
-        function updateFriendStats(friendUsername) {
-            const savedFriends = JSON.parse(localStorage.getItem('savedFriends') || '[]');
-            const friendIndex = savedFriends.findIndex(f => f.username === friendUsername);
-            
-            if (friendIndex >= 0) {
-                const yourClaims = claimedItems.filter(c => c.friendUsername === friendUsername);
-                savedFriends[friendIndex].claimedByYou = yourClaims.length;
-                savedFriends[friendIndex].claimedTotal = yourClaims.reduce((sum, c) => sum + (c.itemPrice || 0), 0).toFixed(2);
-                localStorage.setItem('savedFriends', JSON.stringify(savedFriends));
+            function getCurrencySymbol() {
+                return currentProfile?.currency === 'USD' ? '$'
+                    : currentProfile?.currency === 'EUR' ? '€'
+                    : currentProfile?.currency === 'NOK' ? 'kr '
+                    : currentProfile?.currency === 'SEK' ? 'kr '
+                    : currentProfile?.currency === 'DKK' ? 'kr '
+                    : '£';
             }
-        }
 
-        function viewWishlist(username) {
-            window.location.href = `view-wishlist.html?friend=${encodeURIComponent(username)}`;
-        }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
-
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.clear();
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-            
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
+            async function togglePurchased(itemId, friendUsername) {
+                // Find claim and update purchased status in DB
+                const claim = claimedItems.find(i => i.itemId === itemId && i.friendUsername === friendUsername);
+                if (claim) {
+                    const newPurchased = !claim.purchased;
+                    // Update in Supabase
+                    await supabase
+                        .from('claims')
+                        .update({ purchased: newPurchased })
+                        .eq('item_id', itemId)
+                        .eq('claimed_by', currentUserId);
+                    // Reload
+                    await loadShoppingList();
                 }
             }
-        });
-    </script>
+
+            async function unclaimItem(itemId, friendUsername) {
+                const item = claimedItems.find(i => i.itemId === itemId && i.friendUsername === friendUsername);
+                if (confirm(`Unclaim "${item.itemName}"? It will become available for others to claim.`)) {
+                    await supabase
+                        .from('claims')
+                        .delete()
+                        .eq('item_id', itemId)
+                        .eq('claimed_by', currentUserId);
+                    // Reload
+                    await loadShoppingList();
+                    alert('✓ Item unclaimed');
+                }
+            }
+
+            function viewWishlist(username) {
+                window.location.href = `view-wishlist.html?friend=${encodeURIComponent(username)}`;
+            }
+
+            function toggleSidebar() {
+                document.getElementById('sidebar').classList.toggle('active');
+            }
+
+            async function logout() {
+                if (confirm('Are you sure you want to logout?')) {
+                    await supabase.auth.signOut();
+                    window.location.href = 'login.html';
+                }
+            }
+
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', function(e) {
+                const sidebar = document.getElementById('sidebar');
+                const menuBtn = document.querySelector('.mobile-menu-btn');
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+                        sidebar.classList.remove('active');
+                    }
+                }
+            });
+        </script>
 </body>
 </html>
