@@ -541,10 +541,9 @@
             document.getElementById('userName').textContent = userMeta.fullName || user.email.split('@')[0];
             document.getElementById('userEmail').textContent = user.email;
             document.getElementById('userAvatar').textContent = (userMeta.fullName || user.email)[0].toUpperCase();
-            loadFriends();
+            savedFriends = await loadFriendsFromSupabase();
+            renderFriends();
         });
-
-        // Replace Local Storage with Supabase for savedFriends
 
         // Helper: Get current user ID
         async function getCurrentUserId() {
@@ -553,7 +552,7 @@
         }
 
         // Save a friend's wishlist to Supabase
-        async function saveFriendToSupabase(friendUsername, friendUrl) {
+        async function saveFriendToSupabase(friendUsername, friendUrl, friendName) {
             const userId = await getCurrentUserId();
             if (!userId) return;
 
@@ -563,7 +562,8 @@
                     {
                         user_id: userId,
                         friend_username: friendUsername,
-                        friend_url: friendUrl
+                        friend_url: friendUrl,
+                        friend_name: friendName
                     }
                 ]);
             if (error) {
@@ -578,7 +578,7 @@
 
             const { data, error } = await supabase
                 .from('saved_friends')
-                .select('friend_username, friend_url')
+                .select('friend_username, friend_url, friend_name')
                 .eq('user_id', userId);
 
             if (error) {
@@ -604,6 +604,19 @@
             }
         }
 
+        // Render friends and fetch stats from Supabase
+        async function renderFriends() {
+            const container = document.getElementById('friendsContainer');
+            if (savedFriends.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👥</div>
+                        <h3>No saved wishlists yet</h3>
+                        <p>Add your friends' wishlist links above to start finding the perfect gifts for them!</p>
+                    </div>
+                `;
+                return;
+            }
 
             // Fetch stats for each friend from Supabase (using profiles metadata)
             const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
@@ -611,7 +624,7 @@
                 const { data: users, error } = await supabase
                     .from('profiles')
                     .select('id, username, full_name')
-                    .eq('username', friend.username);
+                    .eq('username', friend.friend_username);
 
                 let userId = users && users.length ? users[0].id : null;
                 let totalItems = 0, availableItems = 0;
@@ -633,10 +646,10 @@
             container.innerHTML = `<div class="friends-grid">${friendsWithStats.map((friend, index) => `
                 <div class="friend-card">
                     <div class="friend-header">
-                        <div class="friend-avatar">${friend.name[0].toUpperCase()}</div>
+                        <div class="friend-avatar">${friend.friend_name[0].toUpperCase()}</div>
                         <div class="friend-info">
-                            <div class="friend-name">${friend.name}</div>
-                            <div class="friend-username">@${friend.username}</div>
+                            <div class="friend-name">${friend.friend_name}</div>
+                            <div class="friend-username">@${friend.friend_username}</div>
                         </div>
                     </div>
                     <div class="friend-stats">
@@ -650,22 +663,17 @@
                         </div>
                     </div>
                     <div class="card-actions">
-                        <button class="btn-secondary" onclick="removeFriend(${index})">Remove</button>
-                        <a href="wishlist-view.html?friend=${encodeURIComponent(friend.username)}" class="btn-view">
+                        <button class="btn-secondary" onclick="removeFriend('${friend.friend_username}')">Remove</button>
+                        <a href="wishlist-view.html?friend=${encodeURIComponent(friend.friend_username)}" class="btn-view">
                             View Wishlist →
                         </a>
                     </div>
                 </div>
             `).join('')}</div>`;
-        
-
-        function getCurrencySymbol() {
-            // You can fetch userMeta.currency if needed from logged-in user
-            return '£';
         }
 
         // Add friend form submission
-        document.getElementById('addFriendForm').addEventListener('submit', function(e) {
+        document.getElementById('addFriendForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const url = document.getElementById('friendUrl').value;
             const urlMatch = url.match(/\/list\/([^\/\?]+)/);
@@ -674,29 +682,26 @@
                 return;
             }
             const username = urlMatch[1];
-            if (savedFriends.some(f => f.username === username)) {
+            const friendName = username.charAt(0).toUpperCase() + username.slice(1);
+
+            // Check if already saved
+            if (savedFriends.some(f => f.friend_username === username)) {
                 alert('You already have this wishlist saved!');
                 return;
             }
-            const friend = {
-                name: username.charAt(0).toUpperCase() + username.slice(1),
-                username: username,
-                url: url,
-                addedDate: new Date().toISOString()
-            };
-            savedFriends.push(friend);
-            localStorage.setItem('savedFriends', JSON.stringify(savedFriends));
+            await saveFriendToSupabase(username, url, friendName);
+            savedFriends = await loadFriendsFromSupabase();
             document.getElementById('friendUrl').value = '';
-            renderFriends();
-            alert(`✓ ${friend.name}'s wishlist has been saved!`);
+            await renderFriends();
+            alert(`✓ ${friendName}'s wishlist has been saved!`);
         });
 
-        function removeFriend(index) {
-            const friend = savedFriends[index];
-            if (confirm(`Remove ${friend.name}'s wishlist?`)) {
-                savedFriends.splice(index, 1);
-                localStorage.setItem('savedFriends', JSON.stringify(savedFriends));
-                renderFriends();
+        // Remove friend (by username)
+        async function removeFriend(username) {
+            if (confirm(`Remove ${username.charAt(0).toUpperCase() + username.slice(1)}'s wishlist?`)) {
+                await removeFriendFromSupabase(username);
+                savedFriends = await loadFriendsFromSupabase();
+                await renderFriends();
             }
         }
 
