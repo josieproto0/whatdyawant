@@ -562,13 +562,13 @@
                 return;
             }
 
-            // Fetch stats for each friend from Supabase (using auth.users metadata)
+            // Fetch stats for each friend from Supabase (using profiles metadata)
             const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
-                // Look up user in auth.users by username in metadata
+                // Look up user in profiles by username in metadata
                 const { data: users, error } = await supabase
-                    .from('auth.users')
-                    .select('id, user_metadata')
-                    .eq('user_metadata->>username', friend.username);
+                    .from('profiles')
+                    .select('id, username, full_name')
+                    .eq('username', friend.username);
 
                 let userId = users && users.length ? users[0].id : null;
                 let totalItems = 0, availableItems = 0;

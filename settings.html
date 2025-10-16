@@ -631,129 +631,156 @@
     </main>
 
     <script>
-        // Load user data
-        window.addEventListener('DOMContentLoaded', function() {
-            loadUserData();
-        });
+            // Supabase-powered settings page using public.profiles table
 
-        function loadUserData() {
-            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-            const userName = localStorage.getItem('userName') || 'User';
-            const userEmail = localStorage.getItem('userEmail') || 'user@email.com';
-            const userCurrency = localStorage.getItem('userCurrency') || 'GBP';
+            let currentUserId = null;
+            let currentProfile = null;
 
-            // Update sidebar
-            document.getElementById('sidebarUserName').textContent = userData.fullName || userName;
-            document.getElementById('sidebarUserEmail').textContent = userEmail;
-            const sidebarInitial = (userData.fullName || userName)[0].toUpperCase();
-            document.getElementById('sidebarAvatar').textContent = sidebarInitial;
+            window.addEventListener('DOMContentLoaded', async function() {
+                // Get current user from Supabase Auth
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                currentUserId = user.id;
 
-            // Update profile section
-            document.getElementById('profileDisplayName').textContent = userData.fullName || userName;
-            document.getElementById('profileDisplayUsername').textContent = `@${userData.username || userName.toLowerCase()}`;
-            document.getElementById('profileAvatar').textContent = sidebarInitial;
+                // Load profile from public.profiles
+                const { data: profiles, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', currentUserId)
+                    .single();
 
-            // Populate form
-            document.getElementById('fullName').value = userData.fullName || userName;
-            document.getElementById('username').value = userData.username || userName.toLowerCase();
-            document.getElementById('email').value = userEmail;
-            document.getElementById('currency').value = userCurrency;
-        }
+                if (error || !profiles) {
+                    alert("Couldn't load profile info.");
+                    return;
+                }
+                currentProfile = profiles;
 
-        // Handle profile form submission
-        document.getElementById('profileForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+                // Update sidebar
+                document.getElementById('sidebarUserName').textContent = currentProfile.full_name || user.email.split('@')[0];
+                document.getElementById('sidebarUserEmail').textContent = user.email;
+                const sidebarInitial = (currentProfile.full_name || user.email)[0].toUpperCase();
+                document.getElementById('sidebarAvatar').textContent = sidebarInitial;
 
-            const fullName = document.getElementById('fullName').value;
-            const username = document.getElementById('username').value;
-            const email = document.getElementById('email').value;
-            const currency = document.getElementById('currency').value;
+                // Update profile section
+                document.getElementById('profileDisplayName').textContent = currentProfile.full_name || user.email.split('@')[0];
+                document.getElementById('profileDisplayUsername').textContent = `@${currentProfile.username || user.email.split('@')[0]}`;
+                document.getElementById('profileAvatar').textContent = sidebarInitial;
 
-            const userData = {
-                fullName: fullName,
-                username: username,
-                email: email,
-                currency: currency,
-                updatedAt: new Date().toISOString()
-            };
+                // Populate form
+                document.getElementById('fullName').value = currentProfile.full_name || '';
+                document.getElementById('username').value = currentProfile.username || '';
+                document.getElementById('email').value = user.email;
+                document.getElementById('currency').value = currentProfile.currency || 'GBP';
+            });
 
-            localStorage.setItem('userData', JSON.stringify(userData));
-            localStorage.setItem('userName', fullName);
-            localStorage.setItem('userEmail', email);
-            localStorage.setItem('userCurrency', currency);
+            // Handle profile form submission
+            document.getElementById('profileForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-            alert('✓ Profile updated successfully!');
-            
-            // Reload to update all displayed info
-            setTimeout(() => window.location.reload(), 500);
-        });
+                const fullName = document.getElementById('fullName').value;
+                const username = document.getElementById('username').value;
+                const currency = document.getElementById('currency').value;
 
-        // Username validation
-        document.getElementById('username').addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
-        });
+                // Update profile in public.profiles
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        full_name: fullName,
+                        username: username,
+                        currency: currency,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', currentUserId);
 
-        function showSpoilers() {
-            if (!confirm('Are you SURE? This will reveal who claimed items on your wishlist and spoil the surprise!')) {
-                return;
-            }
+                if (error) {
+                    alert('Error updating profile: ' + error.message);
+                    return;
+                }
 
-            // Generate demo claims data
-            const wishlistItems = JSON.parse(localStorage.getItem('wishlistItems') || '[]');
-            const claimsList = document.getElementById('claimsList');
-            
-            if (wishlistItems.length === 0) {
-                claimsList.innerHTML = '<p style="color: #6b7280; text-align: center;">You don\'t have any items on your wishlist yet.</p>';
-            } else {
-                // Demo data - in real app, this would come from backend
-                const demoClaimers = ['Mom', 'Dad', 'Sarah', 'Tom', 'Alex'];
-                
-                claimsList.innerHTML = wishlistItems.map((item, index) => {
-                    const isClaimed = Math.random() > 0.4; // 60% chance claimed
-                    const claimer = isClaimed ? demoClaimers[Math.floor(Math.random() * demoClaimers.length)] : null;
-                    
-                    return `
-                        <div class="claim-item">
-                            <div class="claim-item-name">${item.name}</div>
-                            <div class="claim-item-claimer">
-                                ${claimer 
-                                    ? `<strong>Claimed by: ${claimer}</strong>` 
-                                    : 'Not claimed yet'}
+                alert('✓ Profile updated successfully!');
+                setTimeout(() => window.location.reload(), 500);
+            });
+
+            // Username validation
+            document.getElementById('username').addEventListener('input', function(e) {
+                this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
+            });
+
+            // Spoiler: Show claims on your wishlist (from DB)
+            async function showSpoilers() {
+                if (!confirm('Are you SURE? This will reveal who claimed items on your wishlist and spoil the surprise!')) {
+                    return;
+                }
+                // Load wishlist items for current user
+                const { data: wishlistItems, error: wError } = await supabase
+                    .from('wishlist_items')
+                    .select('id, name')
+                    .eq('user_id', currentUserId);
+
+                // Load claims for these items
+                let claims = [];
+                if (wishlistItems && wishlistItems.length > 0) {
+                    const itemIds = wishlistItems.map(item => item.id);
+                    const { data: claimsData, error: cError } = await supabase
+                        .from('claims')
+                        .select('item_id, claimed_by')
+                        .in('item_id', itemIds);
+
+                    claims = claimsData || [];
+                }
+
+                // Compose claim list
+                const claimsList = document.getElementById('claimsList');
+                if (!wishlistItems || wishlistItems.length === 0) {
+                    claimsList.innerHTML = '<p style="color: #6b7280; text-align: center;">You don\'t have any items on your wishlist yet.</p>';
+                } else {
+                    claimsList.innerHTML = wishlistItems.map(item => {
+                        // Find claim for this item
+                        const claim = claims.find(c => c.item_id === item.id);
+                        let claimerName = 'Not claimed yet';
+                        if (claim) {
+                            // Lookup claimed_by in profiles table
+                            claimerName = `<strong>Claimed by: ${claim.claimed_by}</strong>`;
+                        }
+                        return `
+                            <div class="claim-item">
+                                <div class="claim-item-name">${item.name}</div>
+                                <div class="claim-item-claimer">${claimerName}</div>
                             </div>
-                        </div>
-                    `;
-                }).join('');
+                        `;
+                    }).join('');
+                }
+                document.getElementById('spoilerSection').classList.add('active');
             }
 
-            document.getElementById('spoilerSection').classList.add('active');
-        }
-
-        function hideSpoilers() {
-            document.getElementById('spoilerSection').classList.remove('active');
-        }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
-
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.clear();
-                window.location.href = 'login.html';
+            function hideSpoilers() {
+                document.getElementById('spoilerSection').classList.remove('active');
             }
-        }
 
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-            
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
+            function toggleSidebar() {
+                document.getElementById('sidebar').classList.toggle('active');
+            }
+
+            async function logout() {
+                if (confirm('Are you sure you want to logout?')) {
+                    await supabase.auth.signOut();
+                    window.location.href = 'login.html';
                 }
             }
-        });
-    </script>
+
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', function(e) {
+                const sidebar = document.getElementById('sidebar');
+                const menuBtn = document.querySelector('.mobile-menu-btn');
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+                        sidebar.classList.remove('active');
+                    }
+                }
+            });
+        </script>
 </body>
 </html>

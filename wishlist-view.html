@@ -601,11 +601,11 @@
                 return;
             }
 
-            // Find friend's user id in auth.users by user_metadata->>username
+            // Find friend's user id in profiles by username
             const { data: users, error } = await supabase
-                .from('auth.users')
-                .select('id, user_metadata')
-                .eq('user_metadata->>username', friendUsername);
+                .from('profiles')
+                .select('id, username, full_name')
+                .eq('username', friendUsername);
 
             if (!users || users.length === 0) {
                 alert('No such friend found!');
