@@ -34,8 +34,7 @@
     </p>
     <h2>To Do</h2>   
     <p>
-        <input type="checkbox"> Make url autofill details from product page </input>
-        <input type="checkbox"> </input>
+        Make url autofill details from product page
     </p>
     </body>
 </html>
