@@ -529,12 +529,10 @@
 
      <script>
         let savedFriends = [];
-        let userCurrency = 'GBP';
 
-        // Load user data and friends
         window.addEventListener('DOMContentLoaded', async function() {
-            // Get logged in user
-            const { data: { user }, error } = await supabase.auth.getUser();
+            // Get logged in user from Supabase Auth
+            const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 window.location.href = 'login.html';
                 return;
@@ -543,8 +541,6 @@
             document.getElementById('userName').textContent = userMeta.fullName || user.email.split('@')[0];
             document.getElementById('userEmail').textContent = user.email;
             document.getElementById('userAvatar').textContent = (userMeta.fullName || user.email)[0].toUpperCase();
-            userCurrency = userMeta.currency || 'GBP';
-
             loadFriends();
         });
 
@@ -566,25 +562,24 @@
                 return;
             }
 
-            // Fetch stats for each friend from Supabase
+            // Fetch stats for each friend from Supabase (using auth.users metadata)
             const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
-                // Look up user by username
+                // Look up user in auth.users by username in metadata
                 const { data: users, error } = await supabase
-                    .from('users') // or use auth.users if you're using public profiles
-                    .select('*')
-                    .eq('username', friend.username);
+                    .from('auth.users')
+                    .select('id, user_metadata')
+                    .eq('user_metadata->>username', friend.username);
 
                 let userId = users && users.length ? users[0].id : null;
                 let totalItems = 0, availableItems = 0;
                 if (userId) {
                     const { data: items } = await supabase
                         .from('wishlist_items')
-                        .select('*')
+                        .select('id, claimed_by')
                         .eq('user_id', userId);
                     totalItems = items ? items.length : 0;
                     availableItems = items ? items.filter(i => !i.claimed_by).length : 0;
                 }
-                // You can also fetch claim info for each friend here if you add claims table
                 return {
                     ...friend,
                     totalItems,
@@ -622,8 +617,8 @@
         }
 
         function getCurrencySymbol() {
-            const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
-            return symbols[userCurrency] || '$';
+            // You can fetch userMeta.currency if needed from logged-in user
+            return '£';
         }
 
         // Add friend form submission
@@ -632,7 +627,7 @@
             const url = document.getElementById('friendUrl').value;
             const urlMatch = url.match(/\/list\/([^\/\?]+)/);
             if (!urlMatch) {
-                alert('Invalid wishlist URL. Please use the format: https://josieproto0.github.io/whatdyawant/list/username');
+                alert('Invalid wishlist URL. Please use the format: https://whatdyawant.app/list/username');
                 return;
             }
             const username = urlMatch[1];
@@ -642,8 +637,8 @@
             }
             const friend = {
                 name: username.charAt(0).toUpperCase() + username.slice(1),
-                username,
-                url,
+                username: username,
+                url: url,
                 addedDate: new Date().toISOString()
             };
             savedFriends.push(friend);
@@ -673,7 +668,6 @@
             }
         }
 
-        // Close sidebar when clicking outside on mobile
         document.addEventListener('click', function(e) {
             const sidebar = document.getElementById('sidebar');
             const menuBtn = document.querySelector('.mobile-menu-btn');
