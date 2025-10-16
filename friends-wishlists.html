@@ -527,20 +527,23 @@
         <div id="friendsContainer"></div>
     </main>
 
-    <script>
+     <script>
         let savedFriends = [];
+        let userCurrency = 'GBP';
 
         // Load user data and friends
-        window.addEventListener('DOMContentLoaded', function() {
-            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-            const userName = localStorage.getItem('userName') || 'User';
-            const userEmail = localStorage.getItem('userEmail') || 'user@email.com';
-
-            document.getElementById('userName').textContent = userData.fullName || userName;
-            document.getElementById('userEmail').textContent = userEmail;
-            
-            const initial = (userData.fullName || userName)[0].toUpperCase();
-            document.getElementById('userAvatar').textContent = initial;
+        window.addEventListener('DOMContentLoaded', async function() {
+            // Get logged in user
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            const userMeta = user.user_metadata || {};
+            document.getElementById('userName').textContent = userMeta.fullName || user.email.split('@')[0];
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('userAvatar').textContent = (userMeta.fullName || user.email)[0].toUpperCase();
+            userCurrency = userMeta.currency || 'GBP';
 
             loadFriends();
         });
@@ -550,9 +553,8 @@
             renderFriends();
         }
 
-        function renderFriends() {
+        async function renderFriends() {
             const container = document.getElementById('friendsContainer');
-            
             if (savedFriends.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -564,7 +566,33 @@
                 return;
             }
 
-            container.innerHTML = `<div class="friends-grid">${savedFriends.map((friend, index) => `
+            // Fetch stats for each friend from Supabase
+            const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
+                // Look up user by username
+                const { data: users, error } = await supabase
+                    .from('users') // or use auth.users if you're using public profiles
+                    .select('*')
+                    .eq('username', friend.username);
+
+                let userId = users && users.length ? users[0].id : null;
+                let totalItems = 0, availableItems = 0;
+                if (userId) {
+                    const { data: items } = await supabase
+                        .from('wishlist_items')
+                        .select('*')
+                        .eq('user_id', userId);
+                    totalItems = items ? items.length : 0;
+                    availableItems = items ? items.filter(i => !i.claimed_by).length : 0;
+                }
+                // You can also fetch claim info for each friend here if you add claims table
+                return {
+                    ...friend,
+                    totalItems,
+                    availableItems
+                };
+            }));
+
+            container.innerHTML = `<div class="friends-grid">${friendsWithStats.map((friend, index) => `
                 <div class="friend-card">
                     <div class="friend-header">
                         <div class="friend-avatar">${friend.name[0].toUpperCase()}</div>
@@ -573,27 +601,19 @@
                             <div class="friend-username">@${friend.username}</div>
                         </div>
                     </div>
-                    
                     <div class="friend-stats">
                         <div class="stat">
                             <div class="stat-label">Total Items</div>
-                            <div class="stat-value">${friend.totalItems || 0}</div>
+                            <div class="stat-value">${friend.totalItems}</div>
                         </div>
                         <div class="stat">
                             <div class="stat-label">Available</div>
-                            <div class="stat-value">${friend.availableItems || 0}</div>
+                            <div class="stat-value">${friend.availableItems}</div>
                         </div>
                     </div>
-                    
-                    ${friend.claimedByYou > 0 ? `
-                        <div class="claimed-info">
-                            ✓ You've claimed ${friend.claimedByYou} item${friend.claimedByYou > 1 ? 's' : ''} (${getCurrencySymbol()}${friend.claimedTotal || 0})
-                        </div>
-                    ` : ''}
-                    
                     <div class="card-actions">
                         <button class="btn-secondary" onclick="removeFriend(${index})">Remove</button>
-                        <a href="view-wishlist.html?friend=${encodeURIComponent(friend.username)}" class="btn-view">
+                        <a href="wishlist-view.html?friend=${encodeURIComponent(friend.username)}" class="btn-view">
                             View Wishlist →
                         </a>
                     </div>
@@ -602,50 +622,34 @@
         }
 
         function getCurrencySymbol() {
-            const currency = localStorage.getItem('userCurrency') || 'GBP';
             const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
-            return symbols[currency] || '$';
+            return symbols[userCurrency] || '$';
         }
 
         // Add friend form submission
         document.getElementById('addFriendForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            
             const url = document.getElementById('friendUrl').value;
-            
-            // Extract username from URL
             const urlMatch = url.match(/\/list\/([^\/\?]+)/);
             if (!urlMatch) {
-                alert('Invalid wishlist URL. Please use the format: https://whatdyawant.app/list/username');
+                alert('Invalid wishlist URL. Please use the format: https://josieproto0.github.io/whatdyawant/list/username');
                 return;
             }
-            
             const username = urlMatch[1];
-            
-            // Check if already saved
             if (savedFriends.some(f => f.username === username)) {
                 alert('You already have this wishlist saved!');
                 return;
             }
-            
-            // Create friend object with demo data
             const friend = {
                 name: username.charAt(0).toUpperCase() + username.slice(1),
-                username: username,
-                url: url,
-                totalItems: Math.floor(Math.random() * 15) + 5,
-                availableItems: Math.floor(Math.random() * 12) + 3,
-                claimedByYou: 0,
-                claimedTotal: 0,
+                username,
+                url,
                 addedDate: new Date().toISOString()
             };
-            
             savedFriends.push(friend);
             localStorage.setItem('savedFriends', JSON.stringify(savedFriends));
-            
             document.getElementById('friendUrl').value = '';
             renderFriends();
-            
             alert(`✓ ${friend.name}'s wishlist has been saved!`);
         });
 
@@ -662,9 +666,9 @@
             document.getElementById('sidebar').classList.toggle('active');
         }
 
-        function logout() {
+        async function logout() {
             if (confirm('Are you sure you want to logout?')) {
-                localStorage.clear();
+                await supabase.auth.signOut();
                 window.location.href = 'login.html';
             }
         }
@@ -673,13 +677,12 @@
         document.addEventListener('click', function(e) {
             const sidebar = document.getElementById('sidebar');
             const menuBtn = document.querySelector('.mobile-menu-btn');
-            
             if (window.innerWidth <= 768) {
                 if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
                     sidebar.classList.remove('active');
                 }
             }
         });
-    </script>
+        </script>
 </body>
 </html>

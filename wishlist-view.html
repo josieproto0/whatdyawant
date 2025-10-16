@@ -574,237 +574,183 @@
     </main>
 
     <script>
-        let friendUsername = '';
-        let wishlistItems = [];
-        let claimedItems = [];
+let friendUsername = '';
+let friendUserId = '';
+let wishlistItems = [];
+let currentUserId = '';
+let claimedItems = [];
 
-        // Load data
-        window.addEventListener('DOMContentLoaded', function() {
-            // Load user info
-            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-            const userName = localStorage.getItem('userName') || 'User';
-            const userEmail = localStorage.getItem('userEmail') || 'user@email.com';
+// Load data
+window.addEventListener('DOMContentLoaded', async function() {
+    // Load current user info
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+    currentUserId = user.id;
+    document.getElementById('userName').textContent = user.user_metadata?.fullName || user.email.split('@')[0];
+    document.getElementById('userEmail').textContent = user.email;
+    document.getElementById('userAvatar').textContent = (user.user_metadata?.fullName || user.email)[0].toUpperCase();
 
-            document.getElementById('userName').textContent = userData.fullName || userName;
-            document.getElementById('userEmail').textContent = userEmail;
-            
-            const initial = (userData.fullName || userName)[0].toUpperCase();
-            document.getElementById('userAvatar').textContent = initial;
+    // Get friend's username from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    friendUsername = urlParams.get('friend') || '';
+    if (!friendUsername) {
+        alert('No friend specified!');
+        return;
+    }
 
-            // Get friend username from URL
-            const urlParams = new URLSearchParams(window.location.search);
-            friendUsername = urlParams.get('friend') || 'friend';
+    // Find friend's user ID
+    const { data: users, error: userError } = await supabase
+        .from('users') // or use auth.users if you store public profiles in auth.users
+        .select('*')
+        .eq('username', friendUsername);
+    if (!users || users.length === 0) {
+        alert('No such friend found!');
+        return;
+    }
+    friendUserId = users[0].id;
 
-            // Set owner info
-            const ownerName = friendUsername.charAt(0).toUpperCase() + friendUsername.slice(1);
-            document.getElementById('ownerName').textContent = `${ownerName}'s Wishlist`;
-            document.getElementById('ownerUsername').textContent = `@${friendUsername}`;
-            document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
+    // Set owner info
+    const ownerName = friendUsername.charAt(0).toUpperCase() + friendUsername.slice(1);
+    document.getElementById('ownerName').textContent = `${ownerName}'s Wishlist`;
+    document.getElementById('ownerUsername').textContent = `@${friendUsername}`;
+    document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
 
-            // Load wishlist and claims
-            loadWishlist();
-        });
+    // Load wishlist and claims
+    await loadWishlist();
+});
 
-        function loadWishlist() {
-            // Load claimed items for this user
-            claimedItems = JSON.parse(localStorage.getItem('claimedItems') || '[]');
+async function loadWishlist() {
+    // Fetch wishlist items from Supabase
+    const { data: items, error } = await supabase
+        .from('wishlist_items')
+        .select('*')
+        .eq('user_id', friendUserId);
 
-            // Generate demo wishlist (in real app, this would come from backend)
-            wishlistItems = generateDemoWishlist();
+    wishlistItems = items || [];
+    // Fetch claimed items for this user
+    const { data: claims, error: claimsError } = await supabase
+        .from('claims')
+        .select('*')
+        .eq('claimed_by', currentUserId)
+        .eq('friend_user_id', friendUserId);
 
-            renderWishlist();
-            updateSummary();
-        }
+    claimedItems = claims || [];
 
-        function generateDemoWishlist() {
-            // Demo items - in real app, fetch from backend based on friendUsername
-            return [
-                {
-                    id: 1,
-                    name: 'Perfume - Chanel No. 5',
-                    price: 80,
-                    link: 'https://example.com/perfume',
-                    description: '50ml size preferred',
-                    priority: 'must-have',
-                    imageUrl: '',
-                    claimedBy: null
-                },
-                {
-                    id: 2,
-                    name: 'Book - Atomic Habits',
-                    price: 15,
-                    link: 'https://example.com/book',
-                    description: 'Paperback or hardcover, either is great',
-                    priority: 'would-love',
-                    imageUrl: '',
-                    claimedBy: null
-                },
-                {
-                    id: 3,
-                    name: 'Sony Headphones WH-1000XM4',
-                    price: 200,
-                    link: 'https://example.com/headphones',
-                    description: 'Black or silver color',
-                    priority: 'must-have',
-                    imageUrl: '',
-                    claimedBy: 'other' // Claimed by someone else
-                },
-                {
-                    id: 4,
-                    name: 'Plant Pot Set',
-                    price: 25,
-                    link: '',
-                    description: 'Ceramic pots in pastel colors',
-                    priority: 'nice-to-have',
-                    imageUrl: '',
-                    claimedBy: null
-                },
-                {
-                    id: 5,
-                    name: 'Yoga Mat',
-                    price: 35,
-                    link: 'https://example.com/yoga',
-                    description: 'Purple or blue, 6mm thickness',
-                    priority: 'would-love',
-                    imageUrl: '',
-                    claimedBy: null
-                }
-            ];
-        }
+    renderWishlist();
+    updateSummary();
+}
 
-        function renderWishlist() {
-            const grid = document.getElementById('wishlistGrid');
-            
-            grid.innerHTML = wishlistItems.map(item => {
-                const isClaimedByYou = claimedItems.some(c => c.itemId === item.id && c.friendUsername === friendUsername);
-                const isClaimedByOther = item.claimedBy === 'other';
-                
-                let cardClass = 'wishlist-card';
-                if (isClaimedByYou) cardClass += ' claimed-by-you';
-                else if (isClaimedByOther) cardClass += ' claimed';
+function renderWishlist() {
+    const grid = document.getElementById('wishlistGrid');
+    grid.innerHTML = wishlistItems.map(item => {
+        const claim = claimedItems.find(c => c.item_id === item.id);
+        const isClaimedByYou = !!claim;
+        const isClaimedByOther = item.claimed_by && item.claimed_by !== currentUserId;
 
-                return `
-                    <div class="${cardClass}">
-                        <div class="card-image">
-                            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}">` : '🎁'}
-                            ${isClaimedByYou ? '<span class="claimed-badge you">Claimed by You</span>' : ''}
-                            ${isClaimedByOther ? '<span class="claimed-badge">Already Claimed</span>' : ''}
-                        </div>
-                        <div class="card-content">
-                            <div class="card-title">${item.name}</div>
-                            ${item.priority ? `<span class="priority-badge priority-${item.priority}">${item.priority.replace('-', ' ').toUpperCase()}</span>` : ''}
-                            ${item.price ? `<div class="card-price">${getCurrencySymbol()}${parseFloat(item.price).toFixed(2)}</div>` : ''}
-                            ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
-                            ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
-                            
-                            <div class="card-actions">
-                                ${isClaimedByYou ? `
-                                    <button class="btn btn-claimed" disabled>✓ Claimed</button>
-                                    <button class="btn btn-unclaim" onclick="unclaimItem(${item.id})">Unclaim</button>
-                                ` : isClaimedByOther ? `
-                                    <button class="btn" disabled>Already Claimed</button>
-                                ` : `
-                                    <button class="btn btn-claim" onclick="claimItem(${item.id}, '${item.name}', ${item.price})">
-                                        Claim This Gift
-                                    </button>
-                                `}
-                            </div>
-                        </div>
+        let cardClass = 'wishlist-card';
+        if (isClaimedByYou) cardClass += ' claimed-by-you';
+        else if (isClaimedByOther) cardClass += ' claimed';
+
+        return `
+            <div class="${cardClass}">
+                <div class="card-image">
+                    ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : '🎁'}
+                    ${isClaimedByYou ? '<span class="claimed-badge you">Claimed by You</span>' : ''}
+                    ${isClaimedByOther ? '<span class="claimed-badge">Already Claimed</span>' : ''}
+                </div>
+                <div class="card-content">
+                    <div class="card-title">${item.name}</div>
+                    ${item.priority ? `<span class="priority-badge priority-${item.priority}">${item.priority.replace('-', ' ').toUpperCase()}</span>` : ''}
+                    ${item.price ? `<div class="card-price">${getCurrencySymbol()}${parseFloat(item.price).toFixed(2)}</div>` : ''}
+                    ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
+                    ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
+                    <div class="card-actions">
+                        ${isClaimedByYou ? `
+                            <button class="btn btn-claimed" disabled>✓ Claimed</button>
+                            <button class="btn btn-unclaim" onclick="unclaimItem('${item.id}')">Unclaim</button>
+                        ` : isClaimedByOther ? `
+                            <button class="btn" disabled>Already Claimed</button>
+                        ` : `
+                            <button class="btn btn-claim" onclick="claimItem('${item.id}')">
+                                Claim This Gift
+                            </button>
+                        `}
                     </div>
-                `;
-            }).join('');
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getCurrencySymbol() {
+    // You can fetch user's preferred currency instead
+    const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
+    return symbols['GBP']; // Default for now
+}
+
+function updateSummary() {
+    const total = wishlistItems.length;
+    const claimedByYou = claimedItems.length;
+    const claimedByOthers = wishlistItems.filter(i => i.claimed_by && i.claimed_by !== currentUserId).length;
+    const available = total - claimedByYou - claimedByOthers;
+
+    document.getElementById('totalItems').textContent = total;
+    document.getElementById('availableItems').textContent = available;
+    document.getElementById('claimedItems').textContent = claimedByYou;
+}
+
+async function claimItem(itemId) {
+    // Mark as claimed in Supabase
+    const { error } = await supabase
+        .from('claims')
+        .insert([{ item_id: itemId, claimed_by: currentUserId, friend_user_id: friendUserId }]);
+    if (error) {
+        alert('Error claiming item: ' + error.message);
+        return;
+    }
+    await loadWishlist();
+    alert('✓ You\'ve claimed this gift!');
+}
+
+async function unclaimItem(itemId) {
+    if (!confirm('Unclaim this item? It will become available for others.')) return;
+    const { error } = await supabase
+        .from('claims')
+        .delete()
+        .eq('item_id', itemId)
+        .eq('claimed_by', currentUserId);
+    if (error) {
+        alert('Error unclaiming item: ' + error.message);
+        return;
+    }
+    await loadWishlist();
+    alert('✓ Item unclaimed');
+}
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+}
+
+async function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+    }
+}
+
+// Close sidebar when clicking outside on mobile
+document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('sidebar');
+    const menuBtn = document.querySelector('.mobile-menu-btn');
+    if (window.innerWidth <= 768) {
+        if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+            sidebar.classList.remove('active');
         }
-
-        function getCurrencySymbol() {
-            const currency = localStorage.getItem('userCurrency') || 'GBP';
-            const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
-            return symbols[currency] || '$';
-        }
-
-        function updateSummary() {
-            const total = wishlistItems.length;
-            const claimedByYou = claimedItems.filter(c => c.friendUsername === friendUsername).length;
-            const claimedByOthers = wishlistItems.filter(i => i.claimedBy === 'other').length;
-            const available = total - claimedByYou - claimedByOthers;
-
-            document.getElementById('totalItems').textContent = total;
-            document.getElementById('availableItems').textContent = available;
-            document.getElementById('claimedItems').textContent = claimedByYou;
-        }
-
-        function claimItem(itemId, itemName, itemPrice) {
-            const claim = {
-                itemId: itemId,
-                itemName: itemName,
-                itemPrice: itemPrice || 0,
-                friendUsername: friendUsername,
-                friendName: friendUsername.charAt(0).toUpperCase() + friendUsername.slice(1),
-                claimedDate: new Date().toISOString(),
-                purchased: false
-            };
-
-            claimedItems.push(claim);
-            localStorage.setItem('claimedItems', JSON.stringify(claimedItems));
-
-            // Update friend's claimed stats
-            updateFriendStats();
-
-            renderWishlist();
-            updateSummary();
-
-            alert(`✓ You've claimed "${itemName}"! The owner won't see this.`);
-        }
-
-        function unclaimItem(itemId) {
-            if (confirm('Unclaim this item? It will become available for others.')) {
-                claimedItems = claimedItems.filter(c => !(c.itemId === itemId && c.friendUsername === friendUsername));
-                localStorage.setItem('claimedItems', JSON.stringify(claimedItems));
-
-                // Update friend's claimed stats
-                updateFriendStats();
-
-                renderWishlist();
-                updateSummary();
-
-                alert('✓ Item unclaimed');
-            }
-        }
-
-        function updateFriendStats() {
-            // Update the saved friend's statistics
-            const savedFriends = JSON.parse(localStorage.getItem('savedFriends') || '[]');
-            const friendIndex = savedFriends.findIndex(f => f.username === friendUsername);
-            
-            if (friendIndex >= 0) {
-                const yourClaims = claimedItems.filter(c => c.friendUsername === friendUsername);
-                savedFriends[friendIndex].claimedByYou = yourClaims.length;
-                savedFriends[friendIndex].claimedTotal = yourClaims.reduce((sum, c) => sum + (c.itemPrice || 0), 0).toFixed(2);
-                localStorage.setItem('savedFriends', JSON.stringify(savedFriends));
-            }
-        }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
-
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.clear();
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-            
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
-            }
-        });
-    </script>
+    }
+});
+</script>
 </body>
 </html>
