@@ -544,23 +544,66 @@
             loadFriends();
         });
 
-        function loadFriends() {
-            savedFriends = JSON.parse(localStorage.getItem('savedFriends') || '[]');
-            renderFriends();
+        // Replace Local Storage with Supabase for savedFriends
+
+        // Helper: Get current user ID
+        async function getCurrentUserId() {
+            const { data: { user } } = await supabase.auth.getUser();
+            return user ? user.id : null;
         }
 
-        async function renderFriends() {
-            const container = document.getElementById('friendsContainer');
-            if (savedFriends.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">👥</div>
-                        <h3>No saved wishlists yet</h3>
-                        <p>Add your friends' wishlist links above to start finding the perfect gifts for them!</p>
-                    </div>
-                `;
-                return;
+        // Save a friend's wishlist to Supabase
+        async function saveFriendToSupabase(friendUsername, friendUrl) {
+            const userId = await getCurrentUserId();
+            if (!userId) return;
+
+            const { error } = await supabase
+                .from('saved_friends')
+                .insert([
+                    {
+                        user_id: userId,
+                        friend_username: friendUsername,
+                        friend_url: friendUrl
+                    }
+                ]);
+            if (error) {
+                alert('Error saving friend: ' + error.message);
             }
+        }
+
+        // Load saved friends from Supabase
+        async function loadFriendsFromSupabase() {
+            const userId = await getCurrentUserId();
+            if (!userId) return [];
+
+            const { data, error } = await supabase
+                .from('saved_friends')
+                .select('friend_username, friend_url')
+                .eq('user_id', userId);
+
+            if (error) {
+                alert('Error loading friends: ' + error.message);
+                return [];
+            }
+            return data || [];
+        }
+
+        // Remove a saved friend from Supabase
+        async function removeFriendFromSupabase(friendUsername) {
+            const userId = await getCurrentUserId();
+            if (!userId) return;
+
+            const { error } = await supabase
+                .from('saved_friends')
+                .delete()
+                .eq('user_id', userId)
+                .eq('friend_username', friendUsername);
+
+            if (error) {
+                alert('Error removing friend: ' + error.message);
+            }
+        }
+
 
             // Fetch stats for each friend from Supabase (using profiles metadata)
             const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
@@ -614,7 +657,7 @@
                     </div>
                 </div>
             `).join('')}</div>`;
-        }
+        
 
         function getCurrencySymbol() {
             // You can fetch userMeta.currency if needed from logged-in user
