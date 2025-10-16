@@ -574,7 +574,7 @@
     </main>
 
    
-<script>
+        <script>
         let friendUsername = '';
         let friendUserId = '';
         let wishlistItems = [];
@@ -601,11 +601,11 @@
                 return;
             }
 
-            // Find friend's user id in profiles by username
+            // Look up friend's user id in profiles by username (case-insensitive)
             const { data: users, error } = await supabase
                 .from('profiles')
                 .select('id, username, full_name')
-                .eq('username', friendUsername);
+                .ilike('username', friendUsername);
 
             if (!users || users.length === 0) {
                 alert('No such friend found!');
@@ -614,9 +614,9 @@
             friendUserId = users[0].id;
 
             // Set owner info
-            const ownerName = friendUsername.charAt(0).toUpperCase() + friendUsername.slice(1);
+            const ownerName = users[0].full_name || users[0].username.charAt(0).toUpperCase() + users[0].username.slice(1);
             document.getElementById('ownerName').textContent = `${ownerName}'s Wishlist`;
-            document.getElementById('ownerUsername').textContent = `@${friendUsername}`;
+            document.getElementById('ownerUsername').textContent = `@${users[0].username}`;
             document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
 
             await loadWishlist();
@@ -702,6 +702,16 @@
         }
 
         async function claimItem(itemId) {
+            // Check if already claimed
+            const { data: existingClaims } = await supabase
+                .from('claims')
+                .select('id')
+                .eq('item_id', itemId);
+            if (existingClaims && existingClaims.length > 0) {
+                alert('Sorry, this item is already claimed!');
+                return;
+            }
+            // Proceed to claim
             const { error } = await supabase
                 .from('claims')
                 .insert([{ item_id: itemId, claimed_by: currentUserId, friend_user_id: friendUserId }]);

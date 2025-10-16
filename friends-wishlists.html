@@ -527,7 +527,7 @@
         <div id="friendsContainer"></div>
     </main>
 
-     <script>
+            <script>
         let savedFriends = [];
 
         window.addEventListener('DOMContentLoaded', async function() {
@@ -561,7 +561,7 @@
                 .insert([
                     {
                         user_id: userId,
-                        friend_username: friendUsername,
+                        friend_username: friendUsername.toLowerCase(),
                         friend_url: friendUrl,
                         friend_name: friendName
                     }
@@ -620,11 +620,11 @@
 
             // Fetch stats for each friend from Supabase (using profiles metadata)
             const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
-                // Look up user in profiles by username in metadata
+                // Look up user in profiles by username (case-insensitive)
                 const { data: users, error } = await supabase
                     .from('profiles')
                     .select('id, username, full_name')
-                    .eq('username', friend.friend_username);
+                    .ilike('username', friend.friend_username);
 
                 let userId = users && users.length ? users[0].id : null;
                 let totalItems = 0, availableItems = 0;
@@ -681,7 +681,7 @@
                 alert('Invalid wishlist URL. Please use the format: https://whatdyawant.app/list/username');
                 return;
             }
-            const username = urlMatch[1];
+            const username = urlMatch[1].toLowerCase();
             const friendName = username.charAt(0).toUpperCase() + username.slice(1);
 
             // Check if already saved
