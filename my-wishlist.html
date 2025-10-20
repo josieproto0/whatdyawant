@@ -6,6 +6,7 @@
     <title>My Wishlist - Whatdyawant?</title>
     <!-- Supabase JS CDN, place this before your own scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.5/dist/umd/supabase.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="supabase.js"></script>
     <style>
         * {
@@ -610,6 +611,43 @@
             .wishlist-grid {
                 grid-template-columns: 1fr;
             }
+            /* Bulk Upload Modal overrides */
+                #bulkUploadModal .modal-content {
+                padding: 32px;
+                border-radius: 16px;
+                background: #fff;
+                max-width: 700px;
+                width: 100%;
+                }
+                #bulkUploadModal .modal-header h3 {
+                font-size: 24px;
+                color: #143a5c;
+                }
+                #bulkUploadModal .close-btn {
+                font-size: 28px;
+                color: #6b7280;
+                background: none;
+                border: none;
+                cursor: pointer;
+                }
+                #csv-preview table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 1.3rem;
+                }
+                #csv-preview th {
+                background: #f7f7fa;
+                color: #3467d6;
+                font-weight: 600;
+                border-bottom: 2px solid #e0e0e0;
+                padding: 0.6rem;
+                }
+                #csv-preview td {
+                border-bottom: 1px solid #e0e0e0;
+                padding: 0.56rem;
+                font-size: 0.98rem;
+                color: #222;
+                }
         }
     </style>
 </head>
@@ -667,6 +705,9 @@
                 <h2>My Wishlist ✨</h2>
                 <p>Add, edit, and manage the items you'd love to receive</p>
             </div>
+            <button class="btn btn-secondary" onclick="openBulkUploadModal()">
+                📦 Bulk Upload
+            </button> 
             <button class="btn btn-primary" onclick="openAddModal()">
                 ➕ Add Item
             </button>
@@ -675,7 +716,7 @@
         <!-- Wishlist Grid -->
         <div id="wishlistContainer"></div>
     </main>
-    
+
     <!-- Add/Edit Item Modal -->
     <div id="itemModal" class="modal">
         <div class="modal-content">
@@ -731,6 +772,42 @@
             </form>
         </div>
     </div>
+        <!-- Bulk Upload Modal -->
+        <div id="bulkUploadModal" class="modal">
+        <div class="modal-content" style="max-width:700px;">
+            <div class="modal-header">
+            <h3>Bulk Item Uploader</h3>
+            <button class="close-btn" onclick="closeBulkUploadModal()">×</button>
+            </div>
+            <div id="csv-instructions-panel" style="margin-bottom:1.2rem;">
+            <h4>How to Prepare a CSV for Bulk Upload</h4>
+            <ol>
+                <li>Paste your wishlist notes into ChatGPT.</li>
+                <li>Use this prompt:
+                <pre style="white-space:pre-wrap;background:#f3f4f6;border-radius:6px;padding:8px;">
+        Turn the following wishlist notes into a CSV with the following columns:
+        name,description,price,link,priority,image_url
+
+        Make sure each item is on its own row, and the first row is the column headers.
+
+        Here are my notes:
+        [PASTE YOUR NOTES HERE]
+
+        Output only the CSV, nothing else.
+                </pre>
+                </li>
+                <li>Copy the CSV output into a file and save it as <strong>.csv</strong>.</li>
+                <li>Upload your CSV file below and preview before saving!</li>
+            </ol>
+            <p><strong>Example row:</strong> <code>Nintendo Switch,For gaming,299,https://amazon.com/switch,would-love,https://images.example.com/switch.jpg</code></p>
+            </div>
+            <input type="file" id="csv-upload" accept=".csv">
+            <button id="parse-btn" class="btn btn-secondary" style="margin-bottom:1rem;">Parse & Preview</button>
+            <div id="csv-preview" style="margin-bottom:1rem;"></div>
+            <button id="upload-btn" class="btn btn-primary" style="display:none;">Upload to Wishlist</button>
+            <div id="upload-status" style="margin-top:1rem;color:#15803d;font-weight:600;"></div>
+        </div>
+        </div>
 
        <script>
         let wishlistItems = [];
@@ -948,6 +1025,85 @@
             await loadWishlist();
             closeModal();
         });
+                    // Bulk Upload Modal
+            function openBulkUploadModal() {
+            document.getElementById('bulkUploadModal').classList.add('active');
+            }
+            function closeBulkUploadModal() {
+            document.getElementById('bulkUploadModal').classList.remove('active');
+            }
+            // Close modal when clicking outside
+            document.getElementById('bulkUploadModal').addEventListener('click', function(e) {
+            if (e.target === this) closeBulkUploadModal();
+            });
+
+            // CSV Upload Logic
+            let parsedItems = [];
+            document.getElementById('parse-btn').onclick = function() {
+            const fileInput = document.getElementById('csv-upload');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a CSV file.');
+                return;
+            }
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                parsedItems = results.data;
+                showBulkPreview(parsedItems);
+                },
+                error: function(err) {
+                alert('Error parsing CSV: ' + err.message);
+                }
+            });
+            };
+            function showBulkPreview(items) {
+            const previewDiv = document.getElementById('csv-preview');
+            if (!items.length) {
+                previewDiv.innerHTML = '<p>No items found in CSV.</p>';
+                document.getElementById('upload-btn').style.display = 'none';
+                return;
+            }
+            let html = '<table><tr>';
+            for (let key in items[0]) html += `<th>${key}</th>`;
+            html += '</tr>';
+            items.forEach(item => {
+                html += '<tr>';
+                for (let key in items[0]) html += `<td>${item[key] || ''}</td>`;
+                html += '</tr>';
+            });
+            html += '</table><p>Check your items above. If all looks good, upload them!</p>';
+            previewDiv.innerHTML = html;
+            document.getElementById('upload-btn').style.display = '';
+            }
+            document.getElementById('upload-btn').onclick = async function() {
+            if (!parsedItems.length) return alert('No items to upload.');
+            document.getElementById('upload-status').style.color = '#222';
+            document.getElementById('upload-status').innerText = 'Uploading...';
+            // Assumes userId is set from your existing logic
+            const itemsToInsert = parsedItems.map(item => ({
+                name: item.name,
+                description: item.description,
+                price: item.price ? Number(item.price) : null,
+                link: item.link,
+                priority: item.priority,
+                image_url: item.image_url,
+                user_id: userId
+            }));
+            const { error } = await supabase
+                .from('wishlist_items')
+                .insert(itemsToInsert);
+            if (error) {
+                document.getElementById('upload-status').style.color = '#d90429';
+                document.getElementById('upload-status').innerText = 'Upload failed: ' + error.message;
+            } else {
+                document.getElementById('upload-status').style.color = '#15803d';
+                document.getElementById('upload-status').innerText = 'Upload successful!';
+                closeBulkUploadModal();
+                await loadWishlist(); // Refresh your wishlist view
+            }
+            };
 
         // Close modal when clicking outside
         document.getElementById('itemModal').addEventListener('click', function(e) {
