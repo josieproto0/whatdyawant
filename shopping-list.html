@@ -485,6 +485,7 @@
                 width: 100%;
                 margin-bottom: 8px;
             }
+            
         }
     </style>
 </head>
@@ -685,13 +686,16 @@
 
                     return `
                         <div class="friend-section">
-                            <div class="friend-section-header">
-                                <div class="friend-section-title">
-                                    <div class="friend-avatar-small">${friend.name[0].toUpperCase()}</div>
-                                    <h3>For ${friend.name}</h3>
-                                </div>
-                                <div class="section-total">${getCurrencySymbol()}${friendTotal.toFixed(2)}</div>
+                        <div class="friend-section-header">
+                            <div class="friend-section-title">
+                                <div class="friend-avatar-small">${friend.name[0].toUpperCase()}</div>
+                                <h3>For ${friend.name}</h3>
+                                <a class="btn-primary" href="wishlist-view.html?friend=${encodeURIComponent(friend.username)}">
+                                    View Wishlist
+                                </a>
                             </div>
+                            <div class="section-total">${getCurrencySymbol()}${friendTotal.toFixed(2)}</div>
+                        </div>
                             
                             <div class="items-list">
                                 ${friend.items.map((item, index) => `
