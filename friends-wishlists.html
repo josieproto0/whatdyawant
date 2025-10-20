@@ -511,8 +511,7 @@
         </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="main-content">
+     <main class="main-content">
         <div class="page-header">
             <h2>Friends' Wishlists 👥</h2>
             <p>Search for your friends by username and save their wishlists to find the perfect gifts!</p>
@@ -563,17 +562,16 @@
         myUsername = myProfile?.username?.toLowerCase() || "";
 
         savedFriends = await loadFriendsFromSupabase();
-        renderFriends();
+        await renderFriends();
     });
 
-    // Helper: Get current user ID
     async function getCurrentUserId() {
         const { data: { user } } = await supabase.auth.getUser();
         return user ? user.id : null;
     }
 
-    // Save a friend's wishlist to Supabase
-    async function saveFriendToSupabase(friendUsername, friendName) {
+    // Save a friend's wishlist to Supabase (now saving user_id and username)
+    async function saveFriendToSupabase(friendUserId, friendUsername, friendName) {
         const userId = await getCurrentUserId();
         if (!userId) return;
 
@@ -582,6 +580,7 @@
             .insert([
                 {
                     user_id: userId,
+                    friend_user_id: friendUserId,
                     friend_username: friendUsername.toLowerCase(),
                     friend_url: '', // Not used with username search
                     friend_name: friendName
@@ -592,14 +591,14 @@
         }
     }
 
-    // Load saved friends from Supabase
+    // Load saved friends from Supabase (fetch friend_user_id too!)
     async function loadFriendsFromSupabase() {
         const userId = await getCurrentUserId();
         if (!userId) return [];
 
         const { data, error } = await supabase
             .from('saved_friends')
-            .select('friend_username, friend_url, friend_name')
+            .select('friend_user_id, friend_username, friend_url, friend_name')
             .eq('user_id', userId);
 
         if (error) {
@@ -610,7 +609,7 @@
     }
 
     // Remove a saved friend from Supabase
-    async function removeFriendFromSupabase(friendUsername) {
+    async function removeFriendFromSupabase(friendUserId) {
         const userId = await getCurrentUserId();
         if (!userId) return;
 
@@ -618,7 +617,7 @@
             .from('saved_friends')
             .delete()
             .eq('user_id', userId)
-            .eq('friend_username', friendUsername);
+            .eq('friend_user_id', friendUserId);
 
         if (error) {
             alert('Error removing friend: ' + error.message);
@@ -639,39 +638,67 @@
             return;
         }
 
-        // Fetch stats for each friend from Supabase (using profiles metadata)
-        const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
-            // Look up user in profiles by username (case-insensitive)
-            const { data: users } = await supabase
+        // Fetch latest profiles for all friend_user_ids
+        const friendIds = savedFriends.map(f => f.friend_user_id).filter(Boolean);
+        let friendProfiles = [];
+        if (friendIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
                 .from('profiles')
                 .select('id, username, full_name')
-                .ilike('username', friend.friend_username);
+                .in('id', friendIds);
+            friendProfiles = profilesData || [];
+        }
 
-            let userId = users && users.length ? users[0].id : null;
-            let totalItems = 0, availableItems = 0;
+        // Fetch stats for each friend (using up-to-date username from profiles)
+        const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
+            const profile = friendProfiles.find(p => p.id === friend.friend_user_id);
+            let userId = profile ? profile.id : null;
+            let username = profile ? profile.username : friend.friend_username;
+            let fullName = profile ? profile.full_name : friend.friend_name;
+            let totalItems = 0, claimedItemsCount = 0, availableItemsCount = 0;
             if (userId) {
+                // Fetch all wishlist items for this friend
                 const { data: items } = await supabase
                     .from('wishlist_items')
-                    .select('id, claimed_by')
+                    .select('id')
                     .eq('user_id', userId);
+
                 totalItems = items ? items.length : 0;
-                availableItems = items ? items.filter(i => !i.claimed_by).length : 0;
+
+                if (items && items.length > 0) {
+                    // Fetch claims for these items
+                    const itemIds = items.map(i => i.id);
+                    const { data: claims } = await supabase
+                        .from('claims')
+                        .select('item_id')
+                        .in('item_id', itemIds);
+
+                    claimedItemsCount = claims ? claims.length : 0;
+                    availableItemsCount = totalItems - claimedItemsCount;
+                } else {
+                    claimedItemsCount = 0;
+                    availableItemsCount = 0;
+                }
             }
             return {
                 ...friend,
+                userId,
+                username: username,
+                fullName: fullName,
                 totalItems,
-                availableItems,
-                isMe: friend.friend_username.toLowerCase() === myUsername
+                claimedItems: claimedItemsCount,
+                availableItems: availableItemsCount,
+                isMe: username.toLowerCase() === myUsername
             };
         }));
 
         container.innerHTML = `<div class="friends-grid">${friendsWithStats.map((friend, index) => `
             <div class="friend-card">
                 <div class="friend-header">
-                    <div class="friend-avatar">${friend.friend_name[0].toUpperCase()}</div>
+                    <div class="friend-avatar">${friend.fullName[0].toUpperCase()}</div>
                     <div class="friend-info">
-                        <div class="friend-name">${friend.friend_name}</div>
-                        <div class="friend-username">@${friend.friend_username}</div>
+                        <div class="friend-name">${friend.fullName}</div>
+                        <div class="friend-username">@${friend.username}</div>
                     </div>
                 </div>
                 <div class="friend-stats">
@@ -683,12 +710,16 @@
                         <div class="stat-label">Available</div>
                         <div class="stat-value">${friend.availableItems}</div>
                     </div>
+                    <div class="stat">
+                        <div class="stat-label">Claimed</div>
+                        <div class="stat-value">${friend.claimedItems}</div>
+                    </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn-secondary" onclick="removeFriend('${friend.friend_username}')">Remove</button>
+                    <button class="btn-secondary" onclick="removeFriend('${friend.userId}')">Remove</button>
                     ${
                         !friend.isMe
-                        ? `<a href="wishlist-view.html?friend=${encodeURIComponent(friend.friend_username)}" class="btn-view">
+                        ? `<a href="wishlist-view.html?friend=${encodeURIComponent(friend.username)}" class="btn-view">
                             View Wishlist →
                         </a>`
                         : `<span style="color:#aaa; font-size:13px; flex:2; text-align:center; padding:12px 0;">(That's you!)</span>`
@@ -716,38 +747,35 @@
         // Check if user exists
         const { data: friendProfile } = await supabase
             .from('profiles')
-            .select('username, full_name')
+            .select('id, username, full_name')
             .ilike('username', usernameInput)
             .single();
-
-             console.log('Searching for username:', usernameInput);
-
 
         if (!friendProfile) {
             alert("That username doesn't exist.");
             return;
         }
-         
-        
 
         // Check if already saved
-        if (savedFriends.some(f => f.friend_username === usernameInput)) {
+        if (savedFriends.some(f => f.friend_user_id === friendProfile.id)) {
             alert('You already have this friend saved!');
             return;
         }
 
-        // Save to Supabase
-        await saveFriendToSupabase(friendProfile.username, friendProfile.full_name || friendProfile.username);
+        // Save to Supabase (using id and username)
+        await saveFriendToSupabase(friendProfile.id, friendProfile.username, friendProfile.full_name || friendProfile.username);
         savedFriends = await loadFriendsFromSupabase();
         document.getElementById('friendUsername').value = '';
         await renderFriends();
         alert(`✓ ${friendProfile.full_name || friendProfile.username}'s wishlist has been saved!`);
     });
 
-    // Remove friend (by username)
-    async function removeFriend(username) {
-        if (confirm(`Remove ${username.charAt(0).toUpperCase() + username.slice(1)}'s wishlist?`)) {
-            await removeFriendFromSupabase(username);
+    // Remove friend (by user id)
+    async function removeFriend(userId) {
+        const friendProfile = savedFriends.find(f => f.friend_user_id === userId);
+        const friendName = friendProfile?.friend_name || '';
+        if (confirm(`Remove ${friendName.charAt(0).toUpperCase() + friendName.slice(1)}'s wishlist?`)) {
+            await removeFriendFromSupabase(userId);
             savedFriends = await loadFriendsFromSupabase();
             await renderFriends();
         }
