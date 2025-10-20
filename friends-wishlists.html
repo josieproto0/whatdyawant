@@ -208,13 +208,24 @@
             gap: 12px;
         }
 
-        input[type="url"] {
-            flex: 1;
+        /* Username input style - matches your app look */
+        #friendUsername {
+            width: 100%;
             padding: 12px 16px;
             border: 2px solid #e5e7eb;
             border-radius: 8px;
             font-size: 15px;
+            font-family: inherit;
+            background: #fff;
             transition: all 0.2s;
+            margin-bottom: 0;
+            box-sizing: border-box;
+        }
+
+        #friendUsername:focus {
+            outline: none;
+            border-color: #16a34a;
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
         }
 
         input:focus {
@@ -467,7 +478,6 @@
                 <h1>Whatdyawant?</h1>
             </div>
         </div>
-
         <nav class="sidebar-nav">
             <a href="dashboard.html" class="nav-item">
                 <span>🏠</span>
@@ -486,7 +496,6 @@
                 <span>My Shopping List</span>
             </a>
         </nav>
-
         <div class="sidebar-footer">
             <div class="user-profile">
                 <div class="avatar" id="userAvatar">U</div>
@@ -506,20 +515,22 @@
     <main class="main-content">
         <div class="page-header">
             <h2>Friends' Wishlists 👥</h2>
-            <p>Save and browse your friends' wishlists to find the perfect gifts</p>
+            <p>Search for your friends by username and save their wishlists to find the perfect gifts!</p>
         </div>
 
-        <!-- Add Friend's Wishlist -->
+        <!-- Add Friend by Username Section -->
         <div class="add-section">
-            <h3>Add Friend's Wishlist</h3>
-            <form class="add-form" id="addFriendForm">
+            <h3>Add Friend by Username</h3>
+            <form class="add-form" id="addFriendForm" autocomplete="off">
                 <input 
-                    type="url" 
-                    id="friendUrl" 
-                    placeholder="Paste wishlist link (e.g., https://whatdyawant.app/list/john)" 
+                    type="text" 
+                    id="friendUsername" 
+                    placeholder="Enter friend's username (case-insensitive)" 
                     required
+                    pattern="[a-zA-Z0-9_]+"
+                    minlength="3"
                 >
-                <button type="submit" class="btn btn-primary">💾 Save List</button>
+                <button type="submit" class="btn btn-primary">💾 Save Friend</button>
             </form>
         </div>
 
@@ -527,204 +538,241 @@
         <div id="friendsContainer"></div>
     </main>
 
-            <script>
-        let savedFriends = [];
+    <script>
+    let savedFriends = [];
+    let myUsername = "";
 
-        window.addEventListener('DOMContentLoaded', async function() {
-            // Get logged in user from Supabase Auth
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                window.location.href = 'login.html';
-                return;
-            }
-            const userMeta = user.user_metadata || {};
-            document.getElementById('userName').textContent = userMeta.fullName || user.email.split('@')[0];
-            document.getElementById('userEmail').textContent = user.email;
-            document.getElementById('userAvatar').textContent = (userMeta.fullName || user.email)[0].toUpperCase();
-            savedFriends = await loadFriendsFromSupabase();
-            renderFriends();
-        });
-
-        // Helper: Get current user ID
-        async function getCurrentUserId() {
-            const { data: { user } } = await supabase.auth.getUser();
-            return user ? user.id : null;
+    window.addEventListener('DOMContentLoaded', async function() {
+        // Get logged in user from Supabase Auth
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
         }
+        const userMeta = user.user_metadata || {};
+        document.getElementById('userName').textContent = userMeta.fullName || user.email.split('@')[0];
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userAvatar').textContent = (userMeta.fullName || user.email)[0].toUpperCase();
 
-        // Save a friend's wishlist to Supabase
-        async function saveFriendToSupabase(friendUsername, friendUrl, friendName) {
-            const userId = await getCurrentUserId();
-            if (!userId) return;
+        // Get your own username for checks
+        const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', user.id)
+            .single();
+        myUsername = myProfile?.username?.toLowerCase() || "";
 
-            const { error } = await supabase
-                .from('saved_friends')
-                .insert([
-                    {
-                        user_id: userId,
-                        friend_username: friendUsername.toLowerCase(),
-                        friend_url: friendUrl,
-                        friend_name: friendName
-                    }
-                ]);
-            if (error) {
-                alert('Error saving friend: ' + error.message);
-            }
-        }
+        savedFriends = await loadFriendsFromSupabase();
+        renderFriends();
+    });
 
-        // Load saved friends from Supabase
-        async function loadFriendsFromSupabase() {
-            const userId = await getCurrentUserId();
-            if (!userId) return [];
+    // Helper: Get current user ID
+    async function getCurrentUserId() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user ? user.id : null;
+    }
 
-            const { data, error } = await supabase
-                .from('saved_friends')
-                .select('friend_username, friend_url, friend_name')
-                .eq('user_id', userId);
+    // Save a friend's wishlist to Supabase
+    async function saveFriendToSupabase(friendUsername, friendName) {
+        const userId = await getCurrentUserId();
+        if (!userId) return;
 
-            if (error) {
-                alert('Error loading friends: ' + error.message);
-                return [];
-            }
-            return data || [];
-        }
-
-        // Remove a saved friend from Supabase
-        async function removeFriendFromSupabase(friendUsername) {
-            const userId = await getCurrentUserId();
-            if (!userId) return;
-
-            const { error } = await supabase
-                .from('saved_friends')
-                .delete()
-                .eq('user_id', userId)
-                .eq('friend_username', friendUsername);
-
-            if (error) {
-                alert('Error removing friend: ' + error.message);
-            }
-        }
-
-        // Render friends and fetch stats from Supabase
-        async function renderFriends() {
-            const container = document.getElementById('friendsContainer');
-            if (savedFriends.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">👥</div>
-                        <h3>No saved wishlists yet</h3>
-                        <p>Add your friends' wishlist links above to start finding the perfect gifts for them!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Fetch stats for each friend from Supabase (using profiles metadata)
-            const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
-                // Look up user in profiles by username (case-insensitive)
-                const { data: users, error } = await supabase
-                    .from('profiles')
-                    .select('id, username, full_name')
-                    .ilike('username', friend.friend_username);
-
-                let userId = users && users.length ? users[0].id : null;
-                let totalItems = 0, availableItems = 0;
-                if (userId) {
-                    const { data: items } = await supabase
-                        .from('wishlist_items')
-                        .select('id, claimed_by')
-                        .eq('user_id', userId);
-                    totalItems = items ? items.length : 0;
-                    availableItems = items ? items.filter(i => !i.claimed_by).length : 0;
+        const { error } = await supabase
+            .from('saved_friends')
+            .insert([
+                {
+                    user_id: userId,
+                    friend_username: friendUsername.toLowerCase(),
+                    friend_url: '', // Not used with username search
+                    friend_name: friendName
                 }
-                return {
-                    ...friend,
-                    totalItems,
-                    availableItems
-                };
-            }));
+            ]);
+        if (error) {
+            alert('Error saving friend: ' + error.message);
+        }
+    }
 
-            container.innerHTML = `<div class="friends-grid">${friendsWithStats.map((friend, index) => `
-                <div class="friend-card">
-                    <div class="friend-header">
-                        <div class="friend-avatar">${friend.friend_name[0].toUpperCase()}</div>
-                        <div class="friend-info">
-                            <div class="friend-name">${friend.friend_name}</div>
-                            <div class="friend-username">@${friend.friend_username}</div>
-                        </div>
-                    </div>
-                    <div class="friend-stats">
-                        <div class="stat">
-                            <div class="stat-label">Total Items</div>
-                            <div class="stat-value">${friend.totalItems}</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Available</div>
-                            <div class="stat-value">${friend.availableItems}</div>
-                        </div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="btn-secondary" onclick="removeFriend('${friend.friend_username}')">Remove</button>
-                        <a href="wishlist-view.html?friend=${encodeURIComponent(friend.friend_username)}" class="btn-view">
-                            View Wishlist →
-                        </a>
+    // Load saved friends from Supabase
+    async function loadFriendsFromSupabase() {
+        const userId = await getCurrentUserId();
+        if (!userId) return [];
+
+        const { data, error } = await supabase
+            .from('saved_friends')
+            .select('friend_username, friend_url, friend_name')
+            .eq('user_id', userId);
+
+        if (error) {
+            alert('Error loading friends: ' + error.message);
+            return [];
+        }
+        return data || [];
+    }
+
+    // Remove a saved friend from Supabase
+    async function removeFriendFromSupabase(friendUsername) {
+        const userId = await getCurrentUserId();
+        if (!userId) return;
+
+        const { error } = await supabase
+            .from('saved_friends')
+            .delete()
+            .eq('user_id', userId)
+            .eq('friend_username', friendUsername);
+
+        if (error) {
+            alert('Error removing friend: ' + error.message);
+        }
+    }
+
+    // Render friends and fetch stats from Supabase
+    async function renderFriends() {
+        const container = document.getElementById('friendsContainer');
+        if (savedFriends.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">👥</div>
+                    <h3>No saved wishlists yet</h3>
+                    <p>Search for a friend's username above to start finding the perfect gifts for them!</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Fetch stats for each friend from Supabase (using profiles metadata)
+        const friendsWithStats = await Promise.all(savedFriends.map(async (friend) => {
+            // Look up user in profiles by username (case-insensitive)
+            const { data: users } = await supabase
+                .from('profiles')
+                .select('id, username, full_name')
+                .ilike('username', friend.friend_username);
+
+            let userId = users && users.length ? users[0].id : null;
+            let totalItems = 0, availableItems = 0;
+            if (userId) {
+                const { data: items } = await supabase
+                    .from('wishlist_items')
+                    .select('id, claimed_by')
+                    .eq('user_id', userId);
+                totalItems = items ? items.length : 0;
+                availableItems = items ? items.filter(i => !i.claimed_by).length : 0;
+            }
+            return {
+                ...friend,
+                totalItems,
+                availableItems,
+                isMe: friend.friend_username.toLowerCase() === myUsername
+            };
+        }));
+
+        container.innerHTML = `<div class="friends-grid">${friendsWithStats.map((friend, index) => `
+            <div class="friend-card">
+                <div class="friend-header">
+                    <div class="friend-avatar">${friend.friend_name[0].toUpperCase()}</div>
+                    <div class="friend-info">
+                        <div class="friend-name">${friend.friend_name}</div>
+                        <div class="friend-username">@${friend.friend_username}</div>
                     </div>
                 </div>
-            `).join('')}</div>`;
+                <div class="friend-stats">
+                    <div class="stat">
+                        <div class="stat-label">Total Items</div>
+                        <div class="stat-value">${friend.totalItems}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Available</div>
+                        <div class="stat-value">${friend.availableItems}</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn-secondary" onclick="removeFriend('${friend.friend_username}')">Remove</button>
+                    ${
+                        !friend.isMe
+                        ? `<a href="wishlist-view.html?friend=${encodeURIComponent(friend.friend_username)}" class="btn-view">
+                            View Wishlist →
+                        </a>`
+                        : `<span style="color:#aaa; font-size:13px; flex:2; text-align:center; padding:12px 0;">(That's you!)</span>`
+                    }
+                </div>
+            </div>
+        `).join('')}</div>`;
+    }
+
+    // Add friend form submission (username search)
+    document.getElementById('addFriendForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const usernameInput = document.getElementById('friendUsername').value.trim().toLowerCase();
+        if (!usernameInput) {
+            alert("Please enter a username.");
+            return;
         }
 
-        // Add friend form submission
-        document.getElementById('addFriendForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const url = document.getElementById('friendUrl').value;
-            const urlMatch = url.match(/\/list\/([^\/\?]+)/);
-            if (!urlMatch) {
-                alert('Invalid wishlist URL. Please use the format: https://whatdyawant.app/list/username');
-                return;
-            }
-            const username = urlMatch[1].toLowerCase();
-            const friendName = username.charAt(0).toUpperCase() + username.slice(1);
+        // Get your own username
+        if (usernameInput === myUsername) {
+            alert("You can't add yourself as a friend!");
+            return;
+        }
 
-            // Check if already saved
-            if (savedFriends.some(f => f.friend_username === username)) {
-                alert('You already have this wishlist saved!');
-                return;
-            }
-            await saveFriendToSupabase(username, url, friendName);
+        // Check if user exists
+        const { data: friendProfile } = await supabase
+            .from('profiles')
+            .select('username, full_name')
+            .ilike('username', usernameInput)
+            .single();
+
+             console.log('Searching for username:', usernameInput);
+
+
+        if (!friendProfile) {
+            alert("That username doesn't exist.");
+            return;
+        }
+         
+        console.log('Supabase response:', friendProfile, error);
+
+        // Check if already saved
+        if (savedFriends.some(f => f.friend_username === usernameInput)) {
+            alert('You already have this friend saved!');
+            return;
+        }
+
+        // Save to Supabase
+        await saveFriendToSupabase(friendProfile.username, friendProfile.full_name || friendProfile.username);
+        savedFriends = await loadFriendsFromSupabase();
+        document.getElementById('friendUsername').value = '';
+        await renderFriends();
+        alert(`✓ ${friendProfile.full_name || friendProfile.username}'s wishlist has been saved!`);
+    });
+
+    // Remove friend (by username)
+    async function removeFriend(username) {
+        if (confirm(`Remove ${username.charAt(0).toUpperCase() + username.slice(1)}'s wishlist?`)) {
+            await removeFriendFromSupabase(username);
             savedFriends = await loadFriendsFromSupabase();
-            document.getElementById('friendUrl').value = '';
             await renderFriends();
-            alert(`✓ ${friendName}'s wishlist has been saved!`);
-        });
+        }
+    }
 
-        // Remove friend (by username)
-        async function removeFriend(username) {
-            if (confirm(`Remove ${username.charAt(0).toUpperCase() + username.slice(1)}'s wishlist?`)) {
-                await removeFriendFromSupabase(username);
-                savedFriends = await loadFriendsFromSupabase();
-                await renderFriends();
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('active');
+    }
+
+    async function logout() {
+        if (confirm('Are you sure you want to logout?')) {
+            await supabase.auth.signOut();
+            window.location.href = 'login.html';
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const sidebar = document.getElementById('sidebar');
+        const menuBtn = document.querySelector('.mobile-menu-btn');
+        if (window.innerWidth <= 768) {
+            if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
+                sidebar.classList.remove('active');
             }
         }
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-        }
-
-        async function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                await supabase.auth.signOut();
-                window.location.href = 'login.html';
-            }
-        }
-
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
-            }
-        });
-        </script>
+    });
+    </script>
 </body>
 </html>
