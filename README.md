@@ -31,10 +31,16 @@
             <li>View and save other wishlist</li>
             <li>Share personal wishlist</li>
             <li>Claim items on other peoples lists, owner doesn't know</li>
+        </ul>
     </p>
     <h2>To Do</h2>   
     <p>
+        List view
+        Filters
+        Notifications
+        Feedback Button
         Make url autofill details from product page
+        Build bot to convert notes into items
     </p>
     </body>
 </html>
