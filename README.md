@@ -35,12 +35,14 @@
     </p>
     <h2>To Do</h2>   
     <p>
-        List view
-        Filters
-        Notifications
-        Feedback Button
-        Make url autofill details from product page
-        Build bot to convert notes into items
+        <ul>
+        <li>List view</li>
+        <li>Filters</li>
+        <li>Notifications</li>
+        <li>Feedback Button</li>
+        <li>Make url autofill details from product page</li>
+        <li>Build bot to convert notes into items</li>
+        </ul>
     </p>
     </body>
 </html>
