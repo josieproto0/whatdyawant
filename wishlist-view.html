@@ -588,6 +588,7 @@
                 window.location.href = 'login.html';
                 return;
             }
+
             currentUserId = user.id;
             const currentUsername = user.user_metadata?.username?.toLowerCase();
             document.getElementById('userName').textContent = user.user_metadata?.fullName || user.email.split('@')[0];
@@ -638,8 +639,47 @@
             document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
 
             await loadWishlist();
+
+            // Check if friend is already saved
+            let isFriendSaved = false;
+            if (currentUserId && friendUsernameCanonical) {
+                const { data: savedRows } = await supabase
+                    .from('saved_friends')
+                    .select('friend_username')
+                    .eq('user_id', currentUserId)
+                    .eq('friend_username', friendUsernameCanonical);
+
+                isFriendSaved = (savedRows && savedRows.length > 0);
+            }
+
+            // If not saved, show "Save this Wishlist" button under the owner's name
+            if (!isFriendSaved) {
+                const ownerInfoDiv = document.querySelector('.owner-info');
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = '💾 Save this Wishlist';
+                saveBtn.className = 'btn btn-primary';
+                saveBtn.style.marginLeft = '16px';
+                saveBtn.onclick = async () => {
+                    const { error } = await supabase
+                        .from('saved_friends')
+                        .insert([{
+                            user_id: currentUserId,
+                            friend_username: friendUsernameCanonical,
+                            friend_name: ownerName,
+                            friend_url: '', // You can add the full URL here if you want
+                        }]);
+                    if (error) {
+                        alert("Error saving this wishlist: " + error.message);
+                    } else {
+                        saveBtn.textContent = "✓ Wishlist Saved!";
+                        saveBtn.disabled = true;
+                    }
+                };
+                ownerInfoDiv.appendChild(saveBtn);
+            }
         });
 
+            
         async function loadWishlist() {
             // Fetch wishlist items for the friend
             const { data: items, error } = await supabase
@@ -649,9 +689,6 @@
 
             wishlistItems = items || [];
             const itemIds = wishlistItems.map(item => item.id);
-            // Debug logs
-            // console.log("Wishlist items:", wishlistItems);
-            // console.log("Item IDs for claims fetch:", itemIds);
 
             // Fetch all claims for these items
             let itemClaims = [];
