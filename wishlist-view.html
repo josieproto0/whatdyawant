@@ -623,22 +623,43 @@
         });
 
         async function loadWishlist() {
-            // Fetch wishlist items from Supabase
+            // Fetch wishlist items for the friend
             const { data: items, error } = await supabase
                 .from('wishlist_items')
                 .select('*')
                 .eq('user_id', friendUserId);
 
             wishlistItems = items || [];
+            const itemIds = wishlistItems.map(item => item.id);
+            console.log("Wishlist items:", wishlistItems);
+            console.log("Item IDs for claims fetch:", itemIds);
 
-            // Fetch claimed items for this user
-            const { data: claims, error: claimsError } = await supabase
+            // Fetch all claims for these items
+            let itemClaims = [];
+            if (itemIds.length > 0) {
+                const { data: claimsData, error: claimsError } = await supabase
+                    .from('claims')
+                    .select('item_id, claimed_by')
+                    .in('item_id', itemIds);
+                itemClaims = claimsData || [];
+                console.log("Item claims fetched:", itemClaims);
+            }
+
+            // Attach claimed_by to each item for rendering
+            wishlistItems = wishlistItems.map(item => {
+                const claim = itemClaims.find(c => c.item_id === item.id);
+                return { ...item, claimed_by: claim ? claim.claimed_by : null };
+            });
+
+            // Fetch claims by the current user for this friend (for "claimed by you" state)
+            const { data: claims, error: claimsError2 } = await supabase
                 .from('claims')
                 .select('*')
                 .eq('claimed_by', currentUserId)
                 .eq('friend_user_id', friendUserId);
 
             claimedItems = claims || [];
+            console.log("Claims by you:", claimedItems);
 
             renderWishlist();
             updateSummary();
@@ -702,26 +723,33 @@
         }
 
         async function claimItem(itemId) {
-            // Check if already claimed
-            const { data: existingClaims } = await supabase
-                .from('claims')
-                .select('id')
-                .eq('item_id', itemId);
-            if (existingClaims && existingClaims.length > 0) {
-                alert('Sorry, this item is already claimed!');
-                return;
+    // Defensive: check local state first
+                const item = wishlistItems.find(i => i.id === itemId);
+                if (!item) {
+                    alert('Item not found!');
+                    return;
+                }
+                if (item.claimed_by) {
+                    alert('Sorry, this item is already claimed!');
+                    return;
+                }
+
+                // Proceed to claim (still keep the DB error check as a fallback)
+                const { error } = await supabase
+                    .from('claims')
+                    .insert([{ item_id: itemId, claimed_by: currentUserId, friend_user_id: friendUserId }]);
+                if (error) {
+                    if ((error.message || '').includes('duplicate key')) {
+                        alert('Sorry, this item was just claimed by someone else!');
+                        await loadWishlist();
+                        return;
+                    }
+                    alert('Error claiming item: ' + error.message);
+                    return;
+                }
+                await loadWishlist();
+                alert('✓ You\'ve claimed this gift!');
             }
-            // Proceed to claim
-            const { error } = await supabase
-                .from('claims')
-                .insert([{ item_id: itemId, claimed_by: currentUserId, friend_user_id: friendUserId }]);
-            if (error) {
-                alert('Error claiming item: ' + error.message);
-                return;
-            }
-            await loadWishlist();
-            alert('✓ You\'ve claimed this gift!');
-        }
 
         async function unclaimItem(itemId) {
             if (!confirm('Unclaim this item? It will become available for others.')) return;
