@@ -252,6 +252,25 @@
             color: #111827;
         }
 
+        /* Guest Message Box */
+        .guest-message-box {
+            background: #fffbe6;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .guest-message-box .icon {
+            font-size: 28px;
+            margin-right: 8px;
+        }
+
         /* Wishlist Grid */
         .wishlist-grid {
             display: grid;
@@ -581,21 +600,38 @@
         let currentUserId = '';
         let claimedItems = [];
 
+        // Add these functions at top level, outside of any other function
+        function renderGuestWishlist() {
+            const grid = document.getElementById('wishlistGrid');
+            grid.innerHTML = wishlistItems.map(item => {
+                return `
+                    <div class="wishlist-card">
+                        <div class="card-image">
+                            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : '🎁'}
+                        </div>
+                        <div class="card-content">
+                            <div class="card-title">${item.name}</div>
+                            ${item.priority ? `<span class="priority-badge priority-${item.priority}">${item.priority.replace('-', ' ').toUpperCase()}</span>` : ''}
+                            ${item.price ? `<div class="card-price">£${parseFloat(item.price).toFixed(2)}</div>` : ''}
+                            ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
+                            ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
+                            <div class="card-actions">
+                            <button class="btn btn-claim" onclick="redirectToLogin()">Login to Claim this Gift</button>
+                        </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateGuestSummary() {
+            document.getElementById('totalItems').textContent = wishlistItems.length;
+            document.getElementById('availableItems').textContent = wishlistItems.length;
+            document.getElementById('claimedItems').textContent = 0;
+        }
+
         window.addEventListener('DOMContentLoaded', async function() {
-            // Get logged in user from Supabase Auth
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            currentUserId = user.id;
-            const currentUsername = user.user_metadata?.username?.toLowerCase();
-            document.getElementById('userName').textContent = user.user_metadata?.fullName || user.email.split('@')[0];
-            document.getElementById('userEmail').textContent = user.email;
-            document.getElementById('userAvatar').textContent = (user.user_metadata?.fullName || user.email)[0].toUpperCase();
-
-            // Get friend's username from URL
+            // 1. Get friend's username from URL
             const urlParams = new URLSearchParams(window.location.search);
             friendUsername = urlParams.get('friend') || '';
             if (!friendUsername) {
@@ -603,7 +639,7 @@
                 return;
             }
 
-            // Look up friend's user id in profiles by username (case-insensitive)
+            // 2. Look up friend's user id in profiles by username
             const { data: users, error } = await supabase
                 .from('profiles')
                 .select('id, username, full_name')
@@ -614,6 +650,48 @@
                 return;
             }
             friendUserId = users[0].id;
+            const ownerName = users[0].full_name || users[0].username.charAt(0).toUpperCase() + users[0].username.slice(1);
+
+            // Update owner info for everyone
+            document.getElementById('ownerName').textContent = `${ownerName}'s Wishlist`;
+            document.getElementById('ownerUsername').textContent = `@${users[0].username}`;
+            document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
+
+            // 3. NOW check authentication
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                // Message box HTML
+                const mainContent = document.querySelector('.main-content');
+                const msgBox = document.createElement('div');
+                msgBox.className = 'guest-message-box';
+                msgBox.innerHTML = `<span class="icon">🔒</span>
+                    If you want to save this list for later, or see what has already been claimed, please <a href="login.html" style="color:#92400e;text-decoration:underline;font-weight:600;">log in</a>. 
+                    <div>
+                        <button class="btn btn-primary" onclick="redirectToLogin()">💾 Save this Wishlist</button>
+                    </div>`; 
+                    
+                mainContent.insertBefore(msgBox, mainContent.childNodes[0]);
+
+                // Fetch wishlist items for the friend (no claims)
+                const { data: items, error } = await supabase
+                    .from('wishlist_items')
+                    .select('*')
+                    .eq('user_id', friendUserId);
+
+                wishlistItems = items || [];
+                renderGuestWishlist();
+                updateGuestSummary();
+                return;
+            }
+
+            // --- LOGGED IN USER LOGIC BELOW ---
+            currentUserId = user.id;
+            const currentUsername = user.user_metadata?.username?.toLowerCase();
+            document.getElementById('userName').textContent = user.user_metadata?.fullName || user.email.split('@')[0];
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('userAvatar').textContent = (user.user_metadata?.fullName || user.email)[0].toUpperCase();
+
             const friendUsernameCanonical = users[0].username.toLowerCase();
 
             // BLOCK: If current user is viewing their own wishlist, block access
@@ -631,12 +709,6 @@
                 `;
                 return;
             }
-
-            // Set owner info
-            const ownerName = users[0].full_name || users[0].username.charAt(0).toUpperCase() + users[0].username.slice(1);
-            document.getElementById('ownerName').textContent = `${ownerName}'s Wishlist`;
-            document.getElementById('ownerUsername').textContent = `@${users[0].username}`;
-            document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
 
             await loadWishlist();
 
@@ -679,7 +751,8 @@
             }
         });
 
-            
+        // --- The rest of your functions remain unchanged below ---
+
         async function loadWishlist() {
             // Fetch wishlist items for the friend
             const { data: items, error } = await supabase
@@ -698,7 +771,6 @@
                     .select('item_id, claimed_by')
                     .in('item_id', itemIds);
                 itemClaims = claimsData || [];
-                // console.log("Item claims fetched:", itemClaims);
             }
 
             // Attach claimed_by to each item for rendering
@@ -715,8 +787,6 @@
                 .eq('friend_user_id', friendUserId);
 
             claimedItems = claims || [];
-            // console.log("Claims by you:", claimedItems);
-
             renderWishlist();
             updateSummary();
         }
@@ -790,7 +860,6 @@
                 return;
             }
 
-            // Proceed to claim (still keep the DB error check as a fallback)
             const { error } = await supabase
                 .from('claims')
                 .insert([{ item_id: itemId, claimed_by: currentUserId, friend_user_id: friendUserId }]);
@@ -820,6 +889,10 @@
             }
             await loadWishlist();
             alert('✓ Item unclaimed');
+        }
+
+        function redirectToLogin() {
+            window.location.href = "login.html";
         }
 
         function toggleSidebar() {
