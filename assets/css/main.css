@@ -1,0 +1,631 @@
+/* Consolidated main stylesheet for Whatdyawant
+   Updated: added / refined styles for Dashboard welcome message and Share Your Link section
+   Place this file at: assets/css/main.css
+   Then remove per-page <style> blocks and add:
+     <link rel="stylesheet" href="/assets/css/main.css">
+*/
+
+/* ==========================================================================
+   Variables / Base
+   ========================================================================== */
+:root{
+  --color-primary: #16a34a;
+  --color-primary-600: #15803d;
+  --color-accent: #667eea;
+  --muted: #6b7280;
+  --bg: #f9fafb;
+  --card-border: #e5e7eb;
+  --text: #111827;
+  --success: #15803d;
+  --danger: #dc2626;
+  --shadow-sm: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-md: 0 12px 24px rgba(0,0,0,0.08);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* Reset / base */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  min-height:100vh;
+  line-height:1.4;
+}
+
+/* Utility */
+.hidden{display:none}
+.center{display:flex;align-items:center;justify-content:center}
+.container{max-width:1200px;margin:0 auto;padding:0 20px}
+
+/* ==========================================================================
+   Layout (Sidebar / Main)
+   ========================================================================== */
+.sidebar{
+  position:fixed;
+  left:0;
+  top:0;
+  width:280px;
+  height:100vh;
+  background:white;
+  border-right:1px solid var(--card-border);
+  display:flex;
+  flex-direction:column;
+  z-index:100;
+}
+.sidebar-header{padding:24px;border-bottom:1px solid var(--card-border)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%);display:flex;align-items:center;justify-content:center;font-size:20px}
+.logo h1{font-size:20px;color:var(--text);font-weight:700}
+.sidebar-nav{flex:1;padding:16px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;color:#374151;text-decoration:none;margin-bottom:4px;transition:all .2s;font-weight:500}
+.nav-item:hover{background:#dcfce7;color:var(--color-primary-600)}
+.nav-item.active{background:#dcfce7;color:var(--color-primary-600);font-weight:600}
+.sidebar-footer{padding:16px;border-top:1px solid var(--card-border)}
+.user-profile{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:16px}
+.user-info{flex:1;min-width:0}
+.user-name{font-weight:600;color:var(--text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-email{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.footer-buttons{display:flex;gap:8px}
+.btn-small{flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:6px;background:white;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;color:#374151;text-decoration:none}
+.btn-small:hover{background:#f9fafb;border-color:#d1d5db}
+
+/* Main column */
+.main-content{margin-left:280px;padding:32px;min-height:100vh}
+.page-header{margin-bottom:32px}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+
+/* ==========================================================================
+   Buttons & inputs
+   ========================================================================== */
+.btn{padding:12px 24px;border:none;border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);color:white}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(22,163,74,0.3)}
+.btn-secondary{background:white;color:#374151;border:2px solid var(--card-border)}
+.btn-secondary:hover{background:#f9fafb}
+
+/* Form base */
+label{display:block;margin-bottom:8px;color:#374151;font-weight:500;font-size:14px}
+input[type="text"],input[type="email"],input[type="url"],input[type="number"],textarea,select{
+  width:100%;padding:12px 16px;border:2px solid var(--card-border);border-radius:8px;font-size:15px;transition:all .2s;font-family:inherit;
+}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(22,163,74,0.1)}
+
+/* ==========================================================================
+   Empty state
+   ========================================================================== */
+.empty-state{background:white;border:2px dashed var(--card-border);border-radius:16px;padding:64px 32px;text-align:center}
+.empty-state-icon{font-size:80px;margin-bottom:16px;opacity:.3}
+.empty-state h3{font-size:24px;color:var(--text);margin-bottom:8px}
+.empty-state p{color:var(--muted);max-width:400px;margin:0 auto}
+
+/* ==========================================================================
+   Cards (wishlist, friend, dashboard)
+   ========================================================================== */
+.wishlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px}
+.wishlist-card{background:white;border-radius:16px;overflow:hidden;border:1px solid var(--card-border);transition:all .3s;display:flex;flex-direction:column}
+.wishlist-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
+.wishlist-card.claimed{opacity:.7;background:#f9fafb}
+.wishlist-card.claimed-by-you{border:2px solid var(--color-primary);background:#f0fdf4}
+
+.card-image{width:100%;height:200px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:60px;position:relative}
+.card-image img{width:100%;height:100%;object-fit:cover}
+.claimed-badge{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.7);color:white;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.claimed-badge.you{background:var(--color-primary)}
+
+.card-content{padding:20px;flex:1;display:flex;flex-direction:column}
+.card-title{font-size:18px;font-weight:600;color:var(--text);margin-bottom:12px;word-break:break-word}
+.card-description{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:12px;flex:1}
+.card-price{font-size:20px;font-weight:700;color:var(--color-primary);margin-bottom:8px}
+.card-link{display:inline-flex;align-items:center;gap:4px;color:var(--color-primary);text-decoration:none;font-size:14px;font-weight:500}
+.card-link:hover{text-decoration:underline}
+
+.priority-badge{display:inline-block;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;margin-bottom:12px}
+.priority-must-have{background:#fee2e2;color:#991b1b}
+.priority-would-love{background:#fef3c7;color:#92400e}
+.priority-nice-to-have{background:#dbeafe;color:#1e40af}
+
+/* Friend card */
+.friends-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:24px}
+.friend-card{background:white;border-radius:16px;padding:24px;border:1px solid var(--card-border);transition:all .3s}
+.friend-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
+.friend-header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.friend-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:20px;flex-shrink:0}
+.friend-info{flex:1;min-width:0}
+.friend-name{font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px}
+.friend-username{font-size:14px;color:var(--muted)}
+.card-actions{display:flex;gap:8px}
+.btn-secondary{flex:1;padding:10px 16px;border:2px solid var(--card-border);border-radius:8px;background:white;color:#374151;font-size:14px;font-weight:600;cursor:pointer}
+.btn-secondary:hover{background:#f9fafb;border-color:#d1d5db}
+.btn-view{flex:2;padding:10px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);color:white;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
+.btn-view:hover{transform:scale(1.02)}
+
+/* Dashboard cards */
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;margin-bottom:32px}
+.dashboard-card{background:white;border-radius:16px;padding:24px;border:1px solid var(--card-border);transition:all .3s;cursor:pointer}
+.dashboard-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md);border-color:var(--color-primary)}
+.card-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}
+.card-icon.green{background:linear-gradient(135deg,#dcfce7 0%,#bbf7d0 100%)}
+
+/* Dropdown / edit-delete button fixes for wishlist pages */
+
+/* Ensure the menu container is positioned relative so dropdowns can align */
+.card-menu {
+  position: relative;
+  z-index: 1; /* keeps menu button above card content */
+}
+
+/* Menu trigger (three-dot) styling - restore a compact clickable target) */
+.menu-btn {
+  background: none;
+  border: none;
+  padding: 6px;
+  margin: 0;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+/* Focus / keyboard visible state */
+.menu-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22,163,74,0.08);
+  background: rgba(22,163,74,0.03);
+}
+
+/* The dropdown panel - visually separate and above other content */
+.dropdown-menu {
+  display: none; /* toggled via .active in JS */
+  position: absolute;
+  right: 8px;
+  top: calc(100% + 8px);
+  min-width: 160px;
+  background: #ffffff;
+  border: 1px solid var(--card-border, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(6,10,20,0.12);
+  padding: 6px 6px;
+  z-index: 9999; /* ensure it's on top of other elements */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Show the dropdown when active */
+.dropdown-menu.active {
+  display: block;
+}
+
+/* Dropdown items should be full-width buttons (so clicks are reliable) */
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #374151;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+/* Hover/focus states for accessibility & feedback */
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background: #f3f4f6;
+  color: #111827;
+  outline: none;
+}
+
+/* Danger style for delete action */
+.dropdown-item.danger {
+  color: var(--danger, #dc2626);
+}
+.dropdown-item.danger:hover,
+.dropdown-item.danger:focus {
+  background: #feeaea;
+  color: #b91c1c;
+}
+
+/* If your dropdown contains icons + text, align them */
+.dropdown-item .icon {
+  margin-right: 8px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+/* Small-screen behaviour: dropdown becomes full-width modal-like for usability */
+@media (max-width: 520px) {
+  .dropdown-menu {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 18px;
+    top: auto;
+    min-width: auto;
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .menu-btn { padding: 8px; }
+}
+
+/* Defensive rule: if a global button reset removed default cursor/appearance */
+.dropdown-item,
+.menu-btn {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Shopping list */
+
+/* Section container */
+.friend-section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--card-border, #e5e7eb);
+  display: block;
+}
+
+/* Header row: friend name + actions + total */
+.friend-section-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.friend-section-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.friend-avatar-small {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-shrink: 0;
+}
+
+/* Title and "View wishlist" link */
+.friend-section-title h3 {
+  font-size: 18px;
+  margin: 0;
+  color: var(--text, #111827);
+  white-space: nowrap;
+}
+.friend-section .btn-primary {
+  margin-left: 12px;
+  white-space: nowrap;
+  align-self: center;
+}
+
+/* Big total on right side */
+.section-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary, #16a34a);
+  flex-shrink: 0;
+}
+
+/* Items list layout */
+.items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Individual item */
+.shopping-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #fbfcfd;
+  border-radius: 12px;
+  transition: background .15s, transform .12s;
+  align-items: flex-start;
+}
+.shopping-item:hover {
+  background: #f3f6fb;
+  transform: translateY(-2px);
+}
+
+/* Checkbox column */
+.item-checkbox { flex-shrink: 0; display:flex;align-items:center; }
+
+/* Info column */
+.item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.item-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #111827);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+.item-name a { color: inherit; text-decoration: none; }
+.item-link { display:inline-flex; align-items:center; gap:6px; color:var(--color-primary, #16a34a); font-size:13px; text-decoration:none; }
+.item-link:hover { text-decoration:underline; }
+
+/* Price column */
+.item-price {
+  font-size: 16px;
+  font-weight:700;
+  color: var(--text, #111827);
+  margin-left: 12px;
+  flex-shrink: 0;
+  min-width: 90px;
+  text-align: right;
+}
+
+/* Actions column */
+.item-actions {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-shrink:0;
+}
+
+/* Unclaim / mark purchased button */
+.btn-unclaim, .btn-mark {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight:600;
+  cursor:pointer;
+}
+.btn-unclaim { background:white; color:var(--danger,#dc2626); border:1px solid #f3d6d6; }
+.btn-unclaim:hover { background:#fff5f5; }
+.btn-mark { background: var(--color-primary,#16a34a); color: white; border:1px solid rgba(0,0,0,0.02); }
+.btn-mark:hover{ filter:brightness(.95); }
+
+/* Purchased state */
+.shopping-item.purchased {
+  background: #f8faf8;
+  border: 1px dashed rgba(0,0,0,0.04);
+}
+.shopping-item.purchased .item-name { color: #9ca3af; text-decoration: line-through; }
+.shopping-item.purchased .item-price { color: #9ca3af; }
+
+/* Accessibility focus outlines */
+.shopping-item:focus-within { box-shadow: 0 6px 20px rgba(6,10,20,0.06); outline: none; }
+
+/* Small screens: stack the price and actions under the info */
+@media (max-width: 720px) {
+  .shopping-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .item-price { text-align: left; min-width: 0; order: 2; }
+  .item-actions { order: 3; justify-content: flex-start; }
+  .friend-section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .section-total { align-self: flex-end; }
+}
+
+/* Defensive: ensure buttons/icons in item do not overflow */
+.shopping-item .btn, .shopping-item button, .dropdown-item { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Optional: small avatar inside item (if you want to show item image) */
+.item-thumb {
+  width:56px;height:56px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#eee;display:flex;align-items:center;justify-content:center;
+}
+.item-thumb img{width:100%;height:100%;object-fit:cover}
+
+/* ==========================================================================
+   Modals
+   ========================================================================== */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.modal.active{display:flex}
+.modal-content{background:white;border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.close-btn{background:none;border:none;font-size:28px;cursor:pointer;color:var(--muted);padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.close-btn:hover{background:#f3f4f6}
+
+/* ==========================================================================
+   Bulk / CSV preview styles (bulk-item-uploader & csvUploader)
+   ========================================================================== */
+#csv-instructions-panel{background:#f2f6fa;border-radius:8px;padding:1.2rem 1.7rem;margin-bottom:1.8rem;color:#24496c;font-size:1rem;border:1px solid #dae6f5}
+#csv-instructions-panel h3{margin-top:0;color:#23508a;font-size:1.05rem;font-weight:600}
+#csv-instructions-panel pre{background:#eaf3ff;color:#222;border-radius:6px;padding:.7em;font-size:.95em;margin:.5em 0;overflow-x:auto;border:1px solid #dbe6f7}
+#csv-instructions-panel code{background:#eaf3ff;padding:2px 6px;border-radius:4px;font-size:.95em;color:#23508a;border:1px solid #dbe6f7}
+.csv-instructions-tip{margin-top:.7em;font-size:.95em;color:#3467d6}
+#csv-upload{padding:.6rem;border-radius:6px;border:1px solid #e0e0e0;background:#f8fafd}
+#parse-btn,#upload-btn,#edit-wishlist-btn{padding:.6rem 1.7rem;background:#4f8cff;color:#fff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 8px rgba(79,140,255,.09)}
+#parse-btn:hover,#upload-btn:hover,#edit-wishlist-btn:hover{background:#3467d6}
+#csv-preview table{width:100%;border-collapse:collapse;margin-bottom:1.3rem}
+#csv-preview th{background:#f7f7fa;color:#3467d6;font-weight:600;border-bottom:2px solid #e0e0e0;padding:.6rem}
+#csv-preview td{border-bottom:1px solid #e0e0e0;padding:.56rem;font-size:.98rem;color:#222}
+
+/* ==========================================================================
+   Login / Signup page specific
+   ========================================================================== */
+.login-container,.signup-container{background:white;border-radius:24px;padding:48px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.logo-icon{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:24px}
+.welcome-text{text-align:center;margin-bottom:32px}
+.divider{display:flex;align-items:center;text-align:center;margin:24px 0;color:#9ca3af;font-size:14px}
+.divider::before,.divider::after{content:'';flex:1;border-bottom:1px solid var(--card-border)}
+.divider span{padding:0 16px}
+
+/* Signup small helpers */
+.input-hint{font-size:13px;color:var(--muted);margin-top:4px}
+.password-match{font-size:13px;margin-top:4px;display:none}
+.password-match.error{color:var(--danger);display:block}
+.password-match.success{color:var(--success);display:block}
+
+/* ==========================================================================
+   Settings page
+   ========================================================================== */
+.settings-card{background:white;border-radius:16px;padding:32px;margin-bottom:24px;border:1px solid var(--card-border)}
+.profile-header{display:flex;align-items:center;gap:20px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #f3f4f6}
+.avatar-large{width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:36px;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,.1);position:relative}
+.avatar-upload-btn{position:absolute;bottom:-4px;right:-4px;width:36px;height:36px;border-radius:50%;background:white;border:2px solid var(--card-border);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Danger zone */
+.danger-zone{background:#fef2f2;border:2px solid #fecaca}
+.warning-box{background:white;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:20px}
+
+/* Spoiler */
+.spoiler-section{display:none;background:#fef2f2;border:2px solid #dc2626;border-radius:12px;padding:24px;margin-top:24px}
+.spoiler-section.active{display:block}
+
+/* ==========================================================================
+   Shopping list / claimed items
+   ========================================================================== */
+.budget-card{background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);border-radius:16px;padding:32px;color:white;margin-bottom:32px}
+.budget-amount{font-size:48px;font-weight:700;margin-bottom:16px}
+.items-list{display:flex;flex-direction:column;gap:16px}
+.shopping-item{display:flex;align-items:center;gap:16px;padding:16px;background:#f9fafb;border-radius:12px;transition:all .2s}
+.shopping-item:hover{background:#f3f4f6}
+.item-checkbox{flex-shrink:0}
+.checkbox-wrapper input[type="checkbox"]{width:24px;height:24px;cursor:pointer;accent-color:var(--color-primary)}
+.item-info{flex:1;min-width:0}
+.item-name{font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px}
+.item-link{font-size:14px;color:var(--color-primary);text-decoration:none}
+.item-price{font-size:18px;font-weight:700;color:var(--text);flex-shrink:0;margin-right:12px}
+.shopping-item.purchased .item-name{ text-decoration:line-through;color:#9ca3af }
+.shopping-item.purchased .item-price{ color:#9ca3af }
+
+/* ==========================================================================
+   Filters bar (used in multiple pages)
+   ========================================================================== */
+.filters-bar{display:flex;gap:10px;align-items:center;margin-top:12px;margin-bottom:18px;flex-wrap:wrap}
+.filters-bar label{font-size:14px;color:#374151}
+
+/* ==========================================================================
+   Dashboard: Welcome Message + Share Section (ADDED / REFINED)
+   ========================================================================== */
+
+/* Welcome message */
+.welcome-message{
+  background:white;
+  border-radius:16px;
+  border:1px solid var(--card-border);
+  padding:32px;
+  margin-bottom:32px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.03);
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.welcome-message h2{
+  font-size:28px;
+  margin-bottom:4px;
+}
+.welcome-message p{
+  color:var(--muted);
+  font-size:15px;
+  line-height:1.5;
+}
+.welcome-message .updates{
+  margin-top:8px;
+}
+.welcome-message .updates h4{
+  margin-top:16px;margin-bottom:8px;color:var(--text);font-size:16px;
+}
+.welcome-message .updates ul{margin-left:18px;margin-bottom:12px;color:var(--muted);font-size:15px}
+
+/* Share your link section */
+.share-section{
+  background:linear-gradient(135deg,var(--color-primary) 0%,var(--color-primary-600) 100%);
+  border-radius:16px;
+  padding:24px;
+  color:white;
+  margin-bottom:32px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.share-section h3{font-size:20px;margin-bottom:6px}
+.share-section p{opacity:.95;margin-bottom:8px;font-size:15px}
+
+/* Inline share box: input + button */
+.share-box{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  width:100%;
+}
+.share-input{
+  flex:1;
+  padding:12px 16px;
+  border-radius:8px;
+  border:2px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.08);
+  color:white;
+  font-size:14px;
+  font-family:monospace;
+}
+.share-input[readonly]{cursor:text}
+.share-input::placeholder{color:rgba(255,255,255,0.8)}
+.btn-share{
+  padding:12px 20px;
+  border-radius:8px;
+  background:white;
+  color:var(--color-primary);
+  font-weight:600;
+  border:none;
+  cursor:pointer;
+  transition:all .18s;
+  white-space:nowrap;
+}
+.btn-share:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.12)}
+
+/* Small responsive tweak for share box */
+@media (max-width:640px){
+  .share-box{flex-direction:column;align-items:stretch}
+  .btn-share{width:100%}
+}
+
+/* ==========================================================================
+   Misc / responsive
+   ========================================================================== */
+.mobile-menu-btn{display:none;position:fixed;top:20px;left:20px;z-index:200;width:48px;height:48px;border-radius:50%;background:white;border:1px solid var(--card-border);box-shadow:0 4px 12px rgba(0,0,0,.1);cursor:pointer;align-items:center;justify-content:center;font-size:24px}
+
+@media (max-width:900px){.main-content{padding:20px}.sidebar{width:55px;padding-top:1rem}.sidebar-logo{font-size:1rem;margin-bottom:1rem}.sidebar-nav{padding:0 .7rem}}
+@media (max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform .3s}
+  .sidebar.active{transform:translateX(0)}
+  .main-content{margin-left:0;padding:80px 20px 20px}
+  .mobile-menu-btn{display:flex}
+  .wishlist-grid{grid-template-columns:1fr}
+  .dashboard-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+}
+@media (max-width:600px){
+  body{flex-direction:column}
+  .sidebar{width:100%;min-height:0;flex-direction:row;justify-content:space-around}
+  .main-header{font-size:1.3rem}
+  .main-body{margin-top:1rem}
+  .signup-container,.login-container{padding:32px 24px}
+}
+
+/* ==========================================================================
+   End
+   ========================================================================== */

@@ -1,316 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Whatdyawant? - Login</title>
-        <!-- Supabase JS CDN, place this before your own scripts -->
+
+    <!-- Supabase JS CDN (keep before your own scripts) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.5/dist/umd/supabase.min.js"></script>
     <script src="supabase.js"></script>
+
+    <!-- Main consolidated stylesheet if you added it -->
+    <link rel="stylesheet" href="/assets/css/main.css">
+
+    <!-- Page-specific overrides to restore pretty background + centering -->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      /* Full-page layered gradient + soft vignette */
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(800px 400px at 10% 20%, rgba(255,255,255,0.08), transparent 8%),
+          radial-gradient(700px 350px at 90% 80%, rgba(255,255,255,0.04), transparent 6%),
+          linear-gradient(135deg, #667eea 0%, #764ba2 40%, #143a5c 100%);
+        background-attachment: fixed;
+        color: #fff;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+      /* Center the card and give it separation from the background */
+      .login-container {
+        width: 100%;
+        max-width: 460px;
+        background: rgba(255,255,255,0.98); /* light card on top of gradient */
+        color: #111827;
+        border-radius: 20px;
+        padding: 44px 36px;
+        box-shadow: 0 30px 60px rgba(6,10,20,0.35), 0 8px 20px rgba(6,10,20,0.18);
+        transform: translateY(0);
+      }
 
-        .login-container {
-            background: white;
-            border-radius: 24px;
-            padding: 48px;
-            max-width: 440px;
-            width: 100%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
+      /* Logo block */
+      .logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 32px;
-        }
+      .logo-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--color-primary, #16a34a) 0%, var(--color-primary-600, #15803d) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 26px;
+      }
 
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-        }
+      .logo h1 {
+        font-size: 22px;
+        color: #111827;
+        font-weight: 700;
+      }
 
-        .logo h1 {
-            font-size: 28px;
-            color: #111827;
-            font-weight: 700;
-        }
+      /* Welcome text */
+      .welcome-text { text-align: center; margin-bottom: 20px; }
+      .welcome-text h2 { font-size: 22px; color: #111827; margin-bottom: 6px; }
+      .welcome-text p { color: #6b7280; font-size: 14px; }
 
-        .welcome-text {
-            text-align: center;
-            margin-bottom: 32px;
-        }
+      /* Inputs & buttons sizing (slightly larger for comfort) */
+      .form-group input,
+      .form-group textarea,
+      .form-group select {
+        font-size: 15px;
+      }
+      .btn {
+        font-size: 15px;
+        padding: 12px 16px;
+      }
 
-        .welcome-text h2 {
-            font-size: 24px;
-            color: #111827;
-            margin-bottom: 8px;
-        }
+      /* Divider */
+      .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 20px 0;
+        color: #9ca3af;
+        font-size: 14px;
+      }
+      .divider::before,
+      .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .divider span { padding: 0 16px; background: transparent; }
 
-        .welcome-text p {
-            color: #6b7280;
-            font-size: 15px;
-        }
+      /* Link text */
+      .link-text { text-align: center; margin-top: 16px; color: #6b7280; font-size: 14px; }
+      .link-text a { color: var(--color-primary, #16a34a); text-decoration: none; font-weight: 600; }
+      .link-text a:hover { text-decoration: underline; }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #374151;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        input[type="email"],
-        input[type="password"],
-        input[type="text"],
-        input[type="url"],
-        input[type="number"],
-        textarea,
-        select {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            font-size: 15px;
-            transition: all 0.2s;
-            font-family: inherit;
-        }
-
-        input:focus,
-        textarea:focus,
-        select:focus {
-            outline: none;
-            border-color: #16a34a;
-            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 14px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(22, 163, 74, 0.3);
-        }
-
-        .btn-secondary {
-            background: white;
-            color: #374151;
-            border: 2px solid #e5e7eb;
-        }
-
-        .btn-secondary:hover {
-            background: #f9fafb;
-            border-color: #d1d5db;
-        }
-
-        .btn-danger {
-            background: #dc2626;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #b91c1c;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            margin: 24px 0;
-            color: #9ca3af;
-            font-size: 14px;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .divider span {
-            padding: 0 16px;
-        }
-
-        .link-text {
-            text-align: center;
-            margin-top: 20px;
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        .link-text a {
-            color: #16a34a;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .link-text a:hover {
-            text-decoration: underline;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 16px;
-            padding: 32px;
-            max-width: 480px;
-            width: 100%;
-            position: relative;
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .modal-header {
-            margin-bottom: 24px;
-        }
-
-        .modal-header h3 {
-            font-size: 22px;
-            color: #111827;
-            margin-bottom: 8px;
-        }
-
-        .modal-header p {
-            color: #6b7280;
-            font-size: 14px;
-        }
-
-        .modal-list {
-            margin: 20px 0;
-            padding-left: 24px;
-        }
-
-        .modal-list li {
-            margin: 8px 0;
-            color: #374151;
-        }
-
-        .modal-list.can-do li::marker {
-            color: #16a34a;
-        }
-
-        .modal-list.cannot-do li::marker {
-            color: #dc2626;
-        }
-
-        .modal-footer {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .modal-footer .btn {
-            flex: 1;
-        }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            .login-container {
-                padding: 32px 24px;
-            }
-
-            .logo h1 {
-                font-size: 24px;
-            }
-
-            .modal-content {
-                padding: 24px;
-            }
-        }
+      /* Responsive tweaks */
+      @media (max-width: 520px) {
+        .login-container { padding: 28px 18px; border-radius: 16px; }
+        .logo-icon { width: 48px; height: 48px; font-size: 22px; }
+        .logo h1 { font-size: 20px; }
+      }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo">
+    <div class="login-container" role="main" aria-labelledby="login-heading">
+        <div class="logo" aria-hidden="true">
             <div class="logo-icon">🎁</div>
             <h1>Whatdyawant?</h1>
         </div>
-<!-- Change Welcome Text to something cooler -->
-        <div class="welcome-text">
+
+        <div class="welcome-text" id="login-heading">
             <h2>Welcome!</h2>
             <p>Sign in to manage your wishlist</p>
         </div>
 
-        <form id="loginForm">
+        <form id="loginForm" aria-describedby="login-help">
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" placeholder="you@example.com" required>
@@ -321,50 +140,35 @@
                 <input type="password" id="password" placeholder="••••••••" required>
             </div>
 
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" id="loginSubmit" aria-label="Sign in">
                 Sign In
             </button>
         </form>
 
-        <div class="divider">
-            <span>OR</span>
-        </div>
+        <div class="divider" aria-hidden="true"><span>OR</span></div>
 
-        <p class="link-text">
+        <p id="login-help" class="link-text">
             Don't have an account? <a href="signup.html">Sign Up</a>
         </p>
     </div>
 
-
     <script>
-
         // Login form submission
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
 
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
-        // Use Supabase authentication
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
 
-        if (error) {
-            // Show error to user
-            alert(error.message);
-        } else {
-            // Successful login, redirect to dashboard
-            window.location.href = 'dashboard.html';
-        }
-    });
-
-        // Close modal when clicking outside
-        <!--Check if this still works after supabase connection-->
-        document.getElementById('guestModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                hideGuestModal();
+            if (error) {
+                alert(error.message);
+            } else {
+                window.location.href = 'dashboard.html';
             }
         });
     </script>
