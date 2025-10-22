@@ -705,12 +705,52 @@
                 <h2>My Wishlist ✨</h2>
                 <p>Add, edit, and manage the items you'd love to receive</p>
             </div>
-            <button class="btn btn-secondary" onclick="openBulkUploadModal()">
+            <div></div>
+            <button class="btn btn-secondary"
+             onclick="openBulkUploadModal()">
                 📦 Bulk Upload
             </button> 
             <button class="btn btn-primary" onclick="openAddModal()">
                 ➕ Add Item
             </button>
+            </div>
+        </div>
+                <!-- INSERT the following HTML filter controls into the <main class="main-content"> area,
+            ideally right under .page-header (place it before the wishlist grid / container) -->
+        <div class="filters-bar" style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+        <label style="font-size:14px;color:#374151;margin-left: 8px;">
+            Category:
+            <select id="filterPriority" style="margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;width: 120px;" >
+            <option value="all">All</option>
+            <option value="must-have">Must Have</option>
+            <option value="would-love">Would Love</option>
+            <option value="nice-to-have">Nice to Have</option>
+            </select>
+        </label>
+        
+
+        <label style="font-size:14px;color:#374151;margin-left: 8px;">
+            Min Price:
+            <input id="filterMinPrice" type="number" step="0.01" min="0" placeholder="0" style="width:120px;margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+        </label>
+
+        <label style="font-size:14px;color:#374151;margin-left: 8px;">
+            Max Price:
+            <input id="filterMaxPrice" type="number" step="0.01" min="0" placeholder="Any" style="width:120px;margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+        </label>
+
+        <label style="font-size:14px;color:#374151;margin-left: 8px;">
+            Sort:
+            <select id="sortBy" style="margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;width: 120px;">
+            <option value="default">Default</option>
+            <option value="price-asc">Price: Low → High</option>
+            <option value="price-desc">Price: High → Low</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+            </select>
+        </label>
+
+        <button id="clearFiltersBtn" class="btn btn-secondary" style="margin-left:auto;">Clear</button>
         </div>
 
         <!-- Wishlist Grid -->
@@ -839,6 +879,9 @@
 
             // Load wishlist items from Supabase
             await loadWishlist();
+
+            // Wire up filters (now that the DOM controls exist)
+            attachWishlistFilterHandlers();
         });
 
         async function loadWishlist() {
@@ -857,64 +900,169 @@
             renderWishlist();
         }
 
-        function renderWishlist() {
-            const container = document.getElementById('wishlistContainer');
+            // ===== Filters state & helpers for my-wishlist.html =====
+            let filterPriority = 'all';
+            let filterMinPrice = null;
+            let filterMaxPrice = null;
+            let sortBy = 'default';
 
-            if (!wishlistItems || wishlistItems.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🎁</div>
-                        <h3>Your wishlist awaits!</h3>
-                        <p>Start adding items you'd love to receive. Your friends can claim them without you knowing!</p>
-                        <button class="btn btn-primary" onclick="openAddModal()">
-                            ➕ Add Your First Item
-                        </button>
-                    </div>
-                `;
-                return;
+            function readFilterInputs() {
+            const p = document.getElementById('filterPriority').value;
+            const min = document.getElementById('filterMinPrice').value;
+            const max = document.getElementById('filterMaxPrice').value;
+            const s = document.getElementById('sortBy').value;
+
+            filterPriority = p || 'all';
+            filterMinPrice = min !== '' ? parseFloat(min) : null;
+            filterMaxPrice = max !== '' ? parseFloat(max) : null;
+            sortBy = s || 'default';
             }
 
-            container.innerHTML = `<div class="wishlist-grid">${wishlistItems.map((item, index) => `
-                <div class="wishlist-card">
-                    <div class="card-image">
-                        ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : '🎁'}
-                    </div>
-                    <div class="card-content">
-                        <div class="card-header">
-                            <div class="card-title">${item.name}</div>
-                            <div class="card-menu">
-                                <button class="menu-btn" onclick="toggleMenu(event, ${index})">⋮</button>
-                                <div class="dropdown-menu" id="menu-${index}">
-                                    <button class="dropdown-item" onclick="editItem(${index})">
-                                        ✏️ Edit
-                                    </button>
-                                    <button class="dropdown-item danger" onclick="deleteItem(${index})">
-                                        🗑️ Delete
-                                    </button>
+            function clearFilters() {
+            document.getElementById('filterPriority').value = 'all';
+            document.getElementById('filterMinPrice').value = '';
+            document.getElementById('filterMaxPrice').value = '';
+            document.getElementById('sortBy').value = 'default';
+            readFilterInputs();
+            renderWishlist(); // re-render
+            }
+
+            function applyFiltersToItems(items) {
+            // items: array of wishlist items
+            let filtered = (items || []).slice();
+
+            // Priority/category filter
+            if (filterPriority && filterPriority !== 'all') {
+                filtered = filtered.filter(it => (it.priority || '').toLowerCase() === filterPriority.toLowerCase());
+            }
+
+            // Price filters
+            filtered = filtered.filter(it => {
+                const price = it.price !== null && it.price !== undefined && it.price !== '' ? parseFloat(it.price) : null;
+                if (filterMinPrice !== null && (price === null || price < filterMinPrice)) return false;
+                if (filterMaxPrice !== null && (price === null || price > filterMaxPrice)) return false;
+                return true;
+            });
+
+            // Sorting
+            switch (sortBy) {
+                case 'price-asc':
+                filtered.sort((a, b) => (parseFloat(a.price || 0) - parseFloat(b.price || 0)));
+                break;
+                case 'price-desc':
+                filtered.sort((a, b) => (parseFloat(b.price || 0) - parseFloat(a.price || 0)));
+                break;
+                case 'name-asc':
+                filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                break;
+                case 'name-desc':
+                filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+                break;
+                case 'default':
+                default:
+                // keep DB order
+            }
+
+            return filtered;
+            }
+
+            // Hook up filter input events (call this once after DOM loaded)
+            function attachWishlistFilterHandlers() {
+            const inputs = ['filterPriority','filterMinPrice','filterMaxPrice','sortBy'];
+            inputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', () => { readFilterInputs(); renderWishlist(); });
+            });
+            const clearBtn = document.getElementById('clearFiltersBtn');
+            if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+
+            // initialize state
+            readFilterInputs();
+            }
+
+            // Render Wishlist (uses filteredItems and item ids for actions)
+            function renderWishlist() {
+                const container = document.getElementById('wishlistContainer');
+
+                // If there are no items at all, show the "Your wishlist awaits" state
+                if (!wishlistItems || wishlistItems.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎁</div>
+                            <h3>Your wishlist awaits!</h3>
+                            <p>Start adding items you'd love to receive. Your friends can claim them without you knowing!</p>
+                            <button class="btn btn-primary" onclick="openAddModal()">
+                                ➕ Add Your First Item
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Apply filters
+                const filteredItems = applyFiltersToItems(wishlistItems);
+
+                // If filters produce no results, show a helpful empty state
+                if (!filteredItems || filteredItems.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎁</div>
+                            <h3>No items match your filters</h3>
+                            <p>Try clearing or adjusting filters to see more items.</p>
+                            <button class="btn btn-primary" onclick="clearFilters()">
+                                Clear Filters
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render filtered items. Use stable item.id for menu ids and action handlers.
+                container.innerHTML = `<div class="wishlist-grid">${filteredItems.map((item) => `
+                    <div class="wishlist-card">
+                        <div class="card-image">
+                            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : '🎁'}
+                        </div>
+                        <div class="card-content">
+                            <div class="card-header">
+                                <div class="card-title">${item.name}</div>
+                                <div class="card-menu">
+                                    <button class="menu-btn" onclick="toggleMenu(event, '${item.id}')">⋮</button>
+                                    <div class="dropdown-menu" id="menu-${item.id}">
+                                        <button class="dropdown-item" onclick="editItemById('${item.id}')">
+                                            ✏️ Edit
+                                        </button>
+                                        <button class="dropdown-item danger" onclick="deleteItemById('${item.id}')">
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                            ${item.priority ? `<span class="priority-badge priority-${item.priority}">${item.priority.replace('-', ' ').toUpperCase()}</span>` : ''}
+                            ${item.price ? `<div class="card-price">${getCurrencySymbol()}${parseFloat(item.price).toFixed(2)}</div>` : ''}
+                            ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
+                            ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
                         </div>
-                        ${item.priority ? `<span class="priority-badge priority-${item.priority}">${item.priority.replace('-', ' ').toUpperCase()}</span>` : ''}
-                        ${item.price ? `<div class="card-price">${getCurrencySymbol()}${parseFloat(item.price).toFixed(2)}</div>` : ''}
-                        ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
-                        ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
                     </div>
-                </div>
-            `).join('')}</div>`;
-        }
+                `).join('')}</div>`;
+
+                // ensure any open menus are closed if clicking outside (your global handler already does this)
+                closeAllMenus();
+            }
 
         function getCurrencySymbol() {
             const symbols = { GBP: '£', USD: '$', EUR: '€', NOK: 'kr ', SEK: 'kr ', DKK: 'kr ' };
             return symbols[userCurrency] || '$';
         }
 
-        function toggleMenu(event, index) {
+        // toggleMenu now takes an itemId (stable) not an array index
+        function toggleMenu(event, itemId) {
             event.stopPropagation();
-            const menu = document.getElementById(`menu-${index}`);
+            const menu = document.getElementById(`menu-${itemId}`);
             document.querySelectorAll('.dropdown-menu').forEach(m => {
                 if (m !== menu) m.classList.remove('active');
             });
-            menu.classList.toggle('active');
+            if (menu) menu.classList.toggle('active');
         }
 
         function openAddModal() {
@@ -926,6 +1074,7 @@
             document.getElementById('itemModal').classList.add('active');
         }
 
+        // original editItem that uses index remains for internal reuse
         function editItem(index) {
             editingIndex = index;
             const item = wishlistItems[index];
@@ -948,6 +1097,17 @@
             closeAllMenus();
         }
 
+        // New wrapper: edit by item id (futureproof)
+        function editItemById(itemId) {
+            const index = wishlistItems.findIndex(i => i.id === itemId);
+            if (index === -1) {
+                alert('Item not found.');
+                return;
+            }
+            editItem(index);
+        }
+
+        // original deleteItem by index still used internally
         async function deleteItem(index) {
             if (confirm('Are you sure you want to delete this item?')) {
                 const item = wishlistItems[index];
@@ -963,6 +1123,16 @@
                 }
             }
             closeAllMenus();
+        }
+
+        // New wrapper: delete by item id (futureproof)
+        async function deleteItemById(itemId) {
+            const index = wishlistItems.findIndex(i => i.id === itemId);
+            if (index === -1) {
+                alert('Item not found.');
+                return;
+            }
+            await deleteItem(index);
         }
 
         function closeModal() {
@@ -1025,6 +1195,7 @@
             await loadWishlist();
             closeModal();
         });
+
                     // Bulk Upload Modal
             function openBulkUploadModal() {
             document.getElementById('bulkUploadModal').classList.add('active');

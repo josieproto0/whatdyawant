@@ -458,6 +458,18 @@
             box-shadow: none;
         }
 
+        /* Filter bar */
+        .filters-bar {
+            display:flex;
+            gap:10px;
+            align-items:center;
+            margin-top:12px;
+            margin-bottom:18px;
+            flex-wrap:wrap;
+        }
+
+        .filters-bar label { font-size:14px; color:#374151; }
+
         /* Mobile Menu */
         .mobile-menu-btn {
             display: none;
@@ -507,7 +519,7 @@
             }
         }
     </style>
- 
+
 </head>
 <body>
     <!-- Mobile Menu Button -->
@@ -573,6 +585,42 @@
                 </div>
             </div>
 
+            <!-- Filter controls inserted here -->
+            <div class="filters-bar" id="viewFilters">
+                <label>
+                    Category:
+                    <select id="viewFilterPriority" style="margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+                        <option value="all">All</option>
+                        <option value="must-have">Must Have</option>
+                        <option value="would-love">Would Love</option>
+                        <option value="nice-to-have">Nice to Have</option>
+                    </select>
+                </label>
+
+                <label>
+                    Min Price:
+                    <input id="viewFilterMinPrice" type="number" step="0.01" min="0" placeholder="0" style="width:120px;margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+                </label>
+
+                <label>
+                    Max Price:
+                    <input id="viewFilterMaxPrice" type="number" step="0.01" min="0" placeholder="Any" style="width:120px;margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+                </label>
+
+                <label>
+                    Sort:
+                    <select id="viewSortBy" style="margin-left:8px;padding:8px;border-radius:6px;border:1px solid #e5e7eb;">
+                        <option value="default">Default</option>
+                        <option value="price-asc">Price: Low → High</option>
+                        <option value="price-desc">Price: High → Low</option>
+                        <option value="name-asc">Name: A → Z</option>
+                        <option value="name-desc">Name: Z → A</option>
+                    </select>
+                </label>
+
+                <button id="viewClearFiltersBtn" class="btn btn-secondary" style="margin-left:auto;">Clear</button>
+            </div>
+
             <div class="summary-bar">
                 <div class="summary-item">
                     <span class="summary-label">Total Items</span>
@@ -600,10 +648,105 @@
         let currentUserId = '';
         let claimedItems = [];
 
+        // Filter state for this view
+        let viewFilterPriority = 'all';
+        let viewFilterMinPrice = null;
+        let viewFilterMaxPrice = null;
+        let viewSortBy = 'default';
+
+        function readViewFilterInputs() {
+            const p = document.getElementById('viewFilterPriority').value;
+            const min = document.getElementById('viewFilterMinPrice').value;
+            const max = document.getElementById('viewFilterMaxPrice').value;
+            const s = document.getElementById('viewSortBy').value;
+
+            viewFilterPriority = p || 'all';
+            viewFilterMinPrice = min !== '' ? parseFloat(min) : null;
+            viewFilterMaxPrice = max !== '' ? parseFloat(max) : null;
+            viewSortBy = s || 'default';
+        }
+
+        function clearViewFilters() {
+            const elPriority = document.getElementById('viewFilterPriority');
+            const elMin = document.getElementById('viewFilterMinPrice');
+            const elMax = document.getElementById('viewFilterMaxPrice');
+            const elSort = document.getElementById('viewSortBy');
+            if (elPriority) elPriority.value = 'all';
+            if (elMin) elMin.value = '';
+            if (elMax) elMax.value = '';
+            if (elSort) elSort.value = 'default';
+            readViewFilterInputs();
+            renderWishlist();
+        }
+
+        function applyViewFiltersToItems(items) {
+            let filtered = (items || []).slice();
+
+            // Priority/category filter
+            if (viewFilterPriority && viewFilterPriority !== 'all') {
+                filtered = filtered.filter(it => (it.priority || '').toLowerCase() === viewFilterPriority.toLowerCase());
+            }
+
+            // Price filters
+            filtered = filtered.filter(it => {
+                const price = it.price !== null && it.price !== undefined && it.price !== '' ? parseFloat(it.price) : null;
+                if (viewFilterMinPrice !== null && (price === null || price < viewFilterMinPrice)) return false;
+                if (viewFilterMaxPrice !== null && (price === null || price > viewFilterMaxPrice)) return false;
+                return true;
+            });
+
+            // Sorting
+            switch (viewSortBy) {
+                case 'price-asc':
+                    filtered.sort((a, b) => (parseFloat(a.price || 0) - parseFloat(b.price || 0)));
+                    break;
+                case 'price-desc':
+                    filtered.sort((a, b) => (parseFloat(b.price || 0) - parseFloat(a.price || 0)));
+                    break;
+                case 'name-asc':
+                    filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    break;
+                case 'name-desc':
+                    filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+                    break;
+                case 'default':
+                default:
+                // keep DB order
+            }
+
+            return filtered;
+        }
+
+        function attachViewFilterHandlers() {
+            const inputs = ['viewFilterPriority','viewFilterMinPrice','viewFilterMaxPrice','viewSortBy'];
+            inputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', () => { readViewFilterInputs(); renderWishlist(); });
+            });
+            const clearBtn = document.getElementById('viewClearFiltersBtn');
+            if (clearBtn) clearBtn.addEventListener('click', clearViewFilters);
+            readViewFilterInputs();
+        }
+
         // Add these functions at top level, outside of any other function
         function renderGuestWishlist() {
             const grid = document.getElementById('wishlistGrid');
-            grid.innerHTML = wishlistItems.map(item => {
+
+            const filtered = applyViewFiltersToItems(wishlistItems);
+
+            if (!filtered || filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="margin-top:20px;">
+                        <div class="empty-state-icon">🎁</div>
+                        <h3>No items match your filters</h3>
+                        <p>Try clearing filters or adjusting price/category.</p>
+                        <button class="btn btn-primary" onclick="clearViewFilters()">Clear Filters</button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(item => {
                 return `
                     <div class="wishlist-card">
                         <div class="card-image">
@@ -616,8 +759,8 @@
                             ${item.description ? `<div class="card-description">${item.description}</div>` : ''}
                             ${item.link ? `<a href="${item.link}" target="_blank" class="card-link">🔗 View Product</a>` : ''}
                             <div class="card-actions">
-                            <button class="btn btn-claim" onclick="redirectToLogin()">Login to Claim this Gift</button>
-                        </div>
+                                <button class="btn btn-claim" onclick="redirectToLogin()">Login to Claim this Gift</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -657,6 +800,9 @@
             document.getElementById('ownerUsername').textContent = `@${users[0].username}`;
             document.getElementById('ownerAvatar').textContent = ownerName[0].toUpperCase();
 
+            // Attach filter handlers now that DOM controls are present
+            attachViewFilterHandlers();
+
             // 3. NOW check authentication
             const { data: { user } } = await supabase.auth.getUser();
 
@@ -666,7 +812,7 @@
                 const msgBox = document.createElement('div');
                 msgBox.className = 'guest-message-box';
                 msgBox.innerHTML = `<span class="icon">🔒</span>
-                    If you want to save this list for later, or see what has already been claimed, please <a href="login.html" style="color:#92400e;text-decoration:underline;font-weight:600;">log in</a>. 
+                    If you want to save this list for later, or see what has already been claimed, please <a href="login.html" style="color:#92400e;text-decoration:underline;font-weight:600;">log in</a>.
                     <div>
                         <button class="btn btn-primary" onclick="redirectToLogin()">💾 Save this Wishlist</button>
                     </div>`; 
@@ -752,7 +898,6 @@
         });
 
         // --- The rest of your functions remain unchanged below ---
-
         async function loadWishlist() {
             // Fetch wishlist items for the friend
             const { data: items, error } = await supabase
@@ -791,9 +936,27 @@
             updateSummary();
         }
 
+        // Updated renderWishlist uses filters
         function renderWishlist() {
             const grid = document.getElementById('wishlistGrid');
-            grid.innerHTML = wishlistItems.map(item => {
+
+            const filteredItems = applyViewFiltersToItems(wishlistItems);
+
+            if (!filteredItems || filteredItems.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="margin-top:20px;">
+                        <div class="empty-state-icon">🎁</div>
+                        <h3>No items match your filters</h3>
+                        <p>Try clearing filters to see more items.</p>
+                        <button class="btn btn-primary" onclick="clearViewFilters()">
+                            Clear Filters
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filteredItems.map(item => {
                 const claim = claimedItems.find(c => c.item_id === item.id);
                 const isClaimedByYou = !!claim;
                 const isClaimedByOther = item.claimed_by && item.claimed_by !== currentUserId;
