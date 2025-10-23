@@ -1,13 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>My Shopping List - Whatdyawant?</title>
-    <!-- Supabase JS CDN, place this before your own scripts -->
+    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.5/dist/umd/supabase.min.js"></script>
     <script src="supabase.js"></script>
+
+    <!-- Consolidated stylesheet -->
     <link rel="stylesheet" href="/assets/css/main.css">
+
+    <!-- Page-specific fallback styles (you can move into main.css) -->
+    <style>
+      .planned-badge{display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,0.12);color:#4f46e5;font-size:12px;font-weight:600;margin-left:8px}
+      .shopping-item.planned{background:linear-gradient(180deg,rgba(249,250,252,1),rgba(255,255,255,0.95));border:1px dashed rgba(99,102,241,0.12)}
+      .shopping-item.planned .item-meta{color:#6b7280;font-size:13px}
+      #planGiftModal .modal-content{max-width:640px;padding:20px}
+      #planGiftModal .form-row{display:grid;grid-template-columns:1fr 140px;gap:12px}
+      @media (max-width:720px){#planGiftModal .form-row{grid-template-columns:1fr}}
+    </style>
 </head>
 <body>
     <!-- Mobile Menu Button -->
@@ -24,20 +36,16 @@
 
         <nav class="sidebar-nav">
             <a href="dashboard.html" class="nav-item">
-                <span>🏠</span>
-                <span>Dashboard</span>
+                <span>🏠</span><span>Dashboard</span>
             </a>
             <a href="my-wishlist.html" class="nav-item">
-                <span>❤️</span>
-                <span>My Wishlist</span>
+                <span>❤️</span><span>My Wishlist</span>
             </a>
             <a href="friends-wishlists.html" class="nav-item">
-                <span>👥</span>
-                <span>Friends' Wishlists</span>
+                <span>👥</span><span>Friends' Wishlists</span>
             </a>
             <a href="shopping-list.html" class="nav-item active">
-                <span>🛍️</span>
-                <span>My Shopping List</span>
+                <span>🛍️</span><span>My Shopping List</span>
             </a>
         </nav>
 
@@ -58,9 +66,16 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="page-header">
-            <h2>My Shopping List 🛍️</h2>
-            <p>Track the gifts you've claimed and manage your budget</p>
+        <div class="page-header" style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="flex:1">
+              <h2>My Shopping List 🛍️</h2>
+              <p>Track gifts you've claimed and the gift ideas you plan privately</p>
+            </div>
+
+            <!-- Global "Plan a Gift" button -->
+            <div style="align-self:flex-start;">
+              <button id="openPlanGiftBtn" class="btn btn-primary" onclick="openPlanGiftModalFromPage()" title="Plan a gift for a friend">💡 Plan a Gift</button>
+            </div>
         </div>
 
         <!-- Budget Overview -->
@@ -87,244 +102,560 @@
         <div id="shoppingListContainer"></div>
     </main>
 
-     <script>
-            let claimedItems = [];
-            let currentUserId = null;
-            let currentProfile = null;
+    <!-- Plan a Gift Modal -->
+    <div id="planGiftModal" class="modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="planGiftTitle">
+        <div class="modal-header">
+          <h3 id="planGiftTitle">Plan a Gift</h3>
+          <button class="close-btn" onclick="closePlanGiftModal()" aria-label="Close">×</button>
+        </div>
 
-            // Load user data and shopping list
-            window.addEventListener('DOMContentLoaded', async function() {
-                // Get current user from Supabase Auth
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-                currentUserId = user.id;
+        <form id="planGiftForm">
+          <input type="hidden" id="planEditId" value="">
 
-                // Load profile from public.profiles
-                const { data: profile, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', currentUserId)
-                    .single();
+          <div class="form-group">
+            <label for="planFriendSelect">Friend (choose saved friend or select Other)</label>
+            <select id="planFriendSelect">
+              <option value="">-- Select a saved friend --</option>
+              <option value="other">Other (enter name)</option>
+            </select>
+          </div>
 
-                if (error || !profile) {
-                    alert("Couldn't load profile info.");
-                    return;
-                }
-                currentProfile = profile;
+          <div id="planFriendOther" style="display:none;">
+            <div class="form-group">
+              <label for="planFriendName">Friend Name</label>
+              <input id="planFriendName" type="text" placeholder="Friend's name">
+            </div>
+          </div>
 
-                // Update sidebar
-                document.getElementById('userName').textContent = profile.full_name || user.email.split('@')[0];
-                document.getElementById('userEmail').textContent = user.email;
-                const initial = (profile.full_name || user.email)[0].toUpperCase();
-                document.getElementById('userAvatar').textContent = initial;
+          <div class="form-group">
+            <label for="planItemName">Gift Idea (name)</label>
+            <input id="planItemName" type="text" placeholder="E.g. Wireless headphones" required>
+          </div>
 
-                // Fetch claimed items from Supabase (shopping list)
-                await loadShoppingList();
+          <div class="form-row">
+            <div>
+              <label for="planPrice">Price</label>
+              <input id="planPrice" type="number" step="0.01" placeholder="e.g. 59.99">
+            </div>
+            <div>
+              <label for="planLink">Link</label>
+              <input id="planLink" type="url" placeholder="https://">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="planNote">Note</label>
+            <textarea id="planNote" placeholder="Optional note for yourself"></textarea>
+          </div>
+
+          <div class="modal-footer" style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closePlanGiftModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="planSubmitBtn">Save to My Shopping List</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      // State
+      let claimedItems = [];
+      let plannedGifts = [];
+      let currentUserId = null;
+      let currentProfile = null;
+
+      // Helpers to escape
+      function escapeHtml(str){ if (!str) return ''; return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]); }
+      function escapeAttr(str){ if (!str) return ''; return String(str).replace(/"/g,'&quot;'); }
+
+      // Init
+      window.addEventListener('DOMContentLoaded', async function() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUserId = user.id;
+
+        // Load profile
+        const { data: profile, error: pErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUserId)
+          .single();
+        if (pErr || !profile) { alert("Couldn't load profile info."); return; }
+        currentProfile = profile;
+        document.getElementById('userName').textContent = profile.full_name || user.email.split('@')[0];
+        document.getElementById('userEmail').textContent = user.email;
+        document.getElementById('userAvatar').textContent = (profile.full_name || user.email)[0].toUpperCase();
+
+        // Populate friend select and load data
+        await populatePlanFriendSelect();
+        await loadShoppingList();
+
+        // Check if URL has prefill params from wishlist-view
+        checkPlanPrefillFromUrl();
+      });
+
+      // Populate saved friends into select with dataset metadata
+      async function populatePlanFriendSelect() {
+        const select = document.getElementById('planFriendSelect');
+        const otherOpt = document.createElement('option');
+        otherOpt.value = 'other';
+        otherOpt.textContent = 'Other (enter name)';
+
+        select.innerHTML = '<option value="">-- Select a saved friend --</option>';
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { select.appendChild(otherOpt); return; }
+
+        const { data, error } = await supabase
+          .from('saved_friends')
+          .select('friend_user_id, friend_name, friend_username')
+          .eq('user_id', user.id);
+
+        if (error) { console.error('saved_friends load error', error); select.appendChild(otherOpt); return; }
+
+        data.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.friend_user_id || '';
+          const label = f.friend_name ? `${f.friend_name}${f.friend_username ? ` (@${f.friend_username})` : ''}` : (f.friend_username ? `@${f.friend_username}` : f.friend_user_id);
+          opt.textContent = label;
+          if (f.friend_username) opt.dataset.username = f.friend_username;
+          if (f.friend_name) opt.dataset.displayName = f.friend_name;
+          select.appendChild(opt);
+        });
+
+        select.appendChild(otherOpt);
+
+        // If a prefill was set (redirect flow), apply it
+        if (window.__planPrefill) {
+          const pref = window.__planPrefill;
+          if (pref.friendUserId) {
+            const found = Array.from(select.options).find(o => o.value === pref.friendUserId);
+            if (found) {
+              select.value = pref.friendUserId;
+              document.getElementById('planFriendOther').style.display = 'none';
+            } else {
+              select.value = 'other';
+              document.getElementById('planFriendOther').style.display = 'block';
+              document.getElementById('planFriendName').value = pref.friendName || '';
+            }
+          } else if (pref.friendName) {
+            select.value = 'other';
+            document.getElementById('planFriendOther').style.display = 'block';
+            document.getElementById('planFriendName').value = pref.friendName;
+          }
+          window.__planPrefill = null;
+        }
+      }
+
+      document.getElementById('planFriendSelect').addEventListener('change', function(){
+        if (this.value === 'other') {
+          document.getElementById('planFriendOther').style.display = 'block';
+        } else {
+          document.getElementById('planFriendOther').style.display = 'none';
+        }
+      });
+
+      // Load claims + planned gifts
+      async function loadShoppingList() {
+        // Claims
+        const { data: claims } = await supabase
+          .from('claims')
+          .select('item_id, friend_user_id, purchased')
+          .eq('claimed_by', currentUserId);
+        claimedItems = [];
+
+        if (claims && claims.length) {
+          // get all item ids
+          const itemIds = claims.map(c => c.item_id).filter(Boolean);
+          const { data: items } = await supabase
+            .from('wishlist_items')
+            .select('id, name, price, link, user_id')
+            .in('id', itemIds || []);
+          // map friend profiles
+          const friendIds = claims.map(c => c.friend_user_id).filter(Boolean);
+          const { data: profiles } = friendIds.length ? await supabase
+            .from('profiles')
+            .select('id, username, full_name')
+            .in('id', friendIds) : { data: [] };
+
+          claims.forEach(claim => {
+            const itemData = items ? items.find(i => i.id === claim.item_id) : null;
+            const friendProfile = profiles ? profiles.find(p => p.id === claim.friend_user_id) : null;
+            claimedItems.push({
+              itemId: claim.item_id,
+              itemName: itemData?.name || 'Unknown',
+              itemPrice: itemData?.price || 0,
+              itemLink: itemData?.link || '',
+              friendUsername: friendProfile?.username || '',
+              friendName: friendProfile?.full_name || friendProfile?.username || '',
+              purchased: claim.purchased || false,
+              friendUserId: claim.friend_user_id
             });
+          });
+        }
 
-            async function loadShoppingList() {
-                // Get claimed items for this user
-                const { data: claims, error } = await supabase
-                    .from('claims')
-                    .select('item_id, friend_user_id, purchased')
-                    .eq('claimed_by', currentUserId);
+        // Planned gifts for current user
+        const { data: plannedData, error: plannedError } = await supabase
+          .from('shopping_list_items')
+          .select('*')
+          .eq('created_by', currentUserId)
+          .order('created_at', { ascending: false });
 
-                // Get wishlist item details for claimed items
-                claimedItems = [];
-                if (claims && claims.length > 0) {
-                    for (const claim of claims) {
-                        // Get wishlist item details
-                        const { data: itemData } = await supabase
-                            .from('wishlist_items')
-                            .select('id, name, price, link')
-                            .eq('id', claim.item_id)
-                            .single();
+        if (plannedError) { console.error('planned load', plannedError); plannedGifts = []; }
+        else plannedGifts = plannedData || [];
 
-                        // Get friend's profile info for grouping
-                        const { data: friendProfile } = await supabase
-                            .from('profiles')
-                            .select('username, full_name')
-                            .eq('id', claim.friend_user_id)
-                            .single();
+        // render
+        renderShoppingList();
+      }
 
-                        claimedItems.push({
-                            itemId: claim.item_id,
-                            itemName: itemData?.name || 'Unknown',
-                            itemPrice: itemData?.price || 0,
-                            itemLink: itemData?.link || '',
-                            friendUsername: friendProfile?.username || '',
-                            friendName: friendProfile?.full_name || friendProfile?.username || '',
-                            purchased: claim.purchased || false,
-                        });
-                    }
-                }
-                renderShoppingList();
-            }
+      // Render grouped by friend (planned first, then claimed)
+      function renderShoppingList() {
+        const container = document.getElementById('shoppingListContainer');
 
-            function renderShoppingList() {
-                const container = document.getElementById('shoppingListContainer');
-                const budgetCard = document.getElementById('budgetCard');
+        if ((plannedGifts.length === 0) && (claimedItems.length === 0)) {
+          document.getElementById('budgetCard').style.display = 'none';
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🛍️</div>
+              <h3>Your shopping list is empty</h3>
+              <p>Start planning gifts or claim items from friends' wishlists to build your shopping list and track your budget!</p>
+              <a href="friends-wishlists.html" class="btn-primary">Browse Friends' Wishlists</a>
+            </div>`;
+          return;
+        }
 
-                if (claimedItems.length === 0) {
-                    budgetCard.style.display = 'none';
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">🛍️</div>
-                            <h3>Your shopping list is empty</h3>
-                            <p>Start claiming items from your friends' wishlists to build your shopping list and track your gift budget!</p>
-                            <a href="friends-wishlists.html" class="btn-primary">
-                                Browse Friends' Wishlists
-                            </a>
-                        </div>
-                    `;
-                    return;
-                }
+        document.getElementById('budgetCard').style.display = 'block';
+        updateBudgetCard();
 
-                // Show budget card
-                budgetCard.style.display = 'block';
-                updateBudgetCard();
+        // Group
+        const sections = {};
+        const keyFor = (userId, name, username) => userId ? `id:${userId}` : (username ? `u:${username}` : `n:${name || 'friend'}`);
 
-                // Group items by friend
-                const groupedByFriend = {};
-                claimedItems.forEach(item => {
-                    if (!groupedByFriend[item.friendUsername]) {
-                        groupedByFriend[item.friendUsername] = {
-                            name: item.friendName,
-                            username: item.friendUsername,
-                            items: []
-                        };
-                    }
-                    groupedByFriend[item.friendUsername].items.push(item);
-                });
+        claimedItems.forEach(c => {
+          const key = keyFor(c.friendUserId, c.friendName, c.friendUsername);
+          if (!sections[key]) sections[key] = { name: c.friendName || 'Friend', username: c.friendUsername || '', items: { planned: [], claimed: [] } };
+          sections[key].items.claimed.push(c);
+        });
 
-                // Render sections
-                container.innerHTML = Object.values(groupedByFriend).map(friend => {
-                    const friendTotal = friend.items.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
+        plannedGifts.forEach(p => {
+          const key = keyFor(p.friend_user_id, p.friend_name, '');
+          if (!sections[key]) sections[key] = { name: p.friend_name || 'Friend', username: '', items: { planned: [], claimed: [] } };
+          sections[key].items.planned.push({
+            planId: p.id,
+            itemName: p.item_name,
+            itemPrice: p.price || 0,
+            itemLink: p.link || '',
+            note: p.note || '',
+            purchased: p.purchased || false,
+            friendUserId: p.friend_user_id,
+            friendName: p.friend_name
+          });
+        });
 
-                    return `
-                        <div class="friend-section">
-                        <div class="friend-section-header">
-                            <div class="friend-section-title">
-                                <div class="friend-avatar-small">${friend.name[0].toUpperCase()}</div>
-                                <h3>For ${friend.name}</h3>
-                                <a class="btn-primary" href="wishlist-view.html?friend=${encodeURIComponent(friend.username)}">
-                                    View Wishlist
-                                </a>
-                            </div>
-                            <div class="section-total">${getCurrencySymbol()}${friendTotal.toFixed(2)}</div>
-                        </div>
-                            
-                            <div class="items-list">
-                                ${friend.items.map((item, index) => `
-                                    <div class="shopping-item ${item.purchased ? 'purchased' : ''}" data-item-id="${item.itemId}">
-                                        <div class="item-checkbox">
-                                            <div class="checkbox-wrapper">
-                                                <input 
-                                                    type="checkbox" 
-                                                    ${item.purchased ? 'checked' : ''}
-                                                    onchange="togglePurchased('${item.itemId}', '${friend.username}')"
-                                                >
-                                            </div>
-                                        </div>
-                                        <div class="item-info">
-                                            <div class="item-name">${item.itemName}</div>
-                                            ${item.itemLink ? `<a href="${item.itemLink}" class="item-link" target="_blank">🔗 View on ${friend.name}'s wishlist</a>` : ''}
-                                        </div>
-                                        <div class="item-price">${getCurrencySymbol()}${(item.itemPrice || 0).toFixed(2)}</div>
-                                        <div class="item-actions">
-                                            <button class="btn-unclaim" onclick="unclaimItem('${item.itemId}', '${friend.username}')">
-                                                Unclaim
-                                            </button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
+        // Compose HTML
+        let html = Object.values(sections).map(section => {
+          const plannedHtml = section.items.planned.map(p => `
+            <div class="shopping-item planned" data-plan-id="${escapeHtml(p.planId)}">
+              <div class="item-checkbox">
+                <div class="checkbox-wrapper">
+                  <input type="checkbox" ${p.purchased ? 'checked' : ''} onchange="togglePlannedPurchased('${escapeHtml(p.planId)}', this.checked)">
+                </div>
+              </div>
 
-            function updateBudgetCard() {
-                const totalSpend = claimedItems.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
-                const totalItems = claimedItems.length;
-                const purchasedItems = claimedItems.filter(item => item.purchased).length;
-                const remainingItems = totalItems - purchasedItems;
+              <div class="item-info">
+                <div class="item-name">${escapeHtml(p.itemName)} <span class="planned-badge">Planned</span></div>
+                <div class="item-meta">${p.note ? escapeHtml(p.note) + ' · ' : ''}${p.itemLink ? `<a href="${escapeAttr(p.itemLink)}" target="_blank" class="item-link">link</a>` : ''}</div>
+              </div>
 
-                document.getElementById('totalSpend').textContent = `${getCurrencySymbol()}${totalSpend.toFixed(2)}`;
-                document.getElementById('totalItemsCount').textContent = totalItems;
-                document.getElementById('purchasedCount').textContent = purchasedItems;
-                document.getElementById('remainingCount').textContent = remainingItems;
-            }
+              <div class="item-price">${getCurrencySymbol()}${Number(p.itemPrice || 0).toFixed(2)}</div>
 
-            function getCurrencySymbol() {
-                return currentProfile?.currency === 'USD' ? '$'
-                    : currentProfile?.currency === 'EUR' ? '€'
-                    : currentProfile?.currency === 'NOK' ? 'kr '
-                    : currentProfile?.currency === 'SEK' ? 'kr '
-                    : currentProfile?.currency === 'DKK' ? 'kr '
-                    : '£';
-            }
+              <div class="item-actions">
+                <button class="btn-unclaim" onclick="deletePlannedGift('${escapeHtml(p.planId)}')">Delete</button>
+                <button class="btn-mark" onclick="editPlannedGift('${escapeHtml(p.planId)}')">Edit</button>
+              </div>
+            </div>
+          `).join('');
 
-            async function togglePurchased(itemId, friendUsername) {
-                console.log("currentUserId:", currentUserId);
-                // Find claim and update purchased status in DB
-                const claim = claimedItems.find(i => i.itemId === itemId && i.friendUsername === friendUsername);
-                if (claim) {
-                    const newPurchased = !claim.purchased;
-                    // Update in Supabase
-                    await supabase
-                        .from('claims')
-                        .update({ purchased: newPurchased })
-                        .eq('item_id', itemId)
-                        .eq('claimed_by', currentUserId);
-                    // Reload
-                    await loadShoppingList();
-                }
-                
-            }
+          const claimedHtml = section.items.claimed.map(c => `
+            <div class="shopping-item ${c.purchased ? 'purchased' : ''}" data-item-id="${escapeHtml(c.itemId)}">
+              <div class="item-checkbox"><div class="checkbox-wrapper"><input type="checkbox" ${c.purchased ? 'checked' : ''} onchange="togglePurchased('${escapeHtml(c.itemId)}','${encodeURIComponent(c.friendUsername)}')"></div></div>
+              <div class="item-info">
+                <div class="item-name">${escapeHtml(c.itemName)}</div>
+                ${c.itemLink ? `<a href="${escapeAttr(c.itemLink)}" class="item-link" target="_blank">🔗 View on ${escapeHtml(section.name)}</a>` : ''}
+              </div>
+              <div class="item-price">${getCurrencySymbol()}${Number(c.itemPrice || 0).toFixed(2)}</div>
+              <div class="item-actions">
+                <button class="btn-unclaim" onclick="unclaimItem('${escapeHtml(c.itemId)}','${encodeURIComponent(c.friendUsername)}')">Unclaim</button>
+              </div>
+            </div>
+          `).join('');
 
-            async function unclaimItem(itemId, friendUsername) {
-                const item = claimedItems.find(i => i.itemId === itemId && i.friendUsername === friendUsername);
-                if (confirm(`Unclaim "${item.itemName}"? It will become available for others to claim.`)) {
-                    await supabase
-                        .from('claims')
-                        .delete()
-                        .eq('item_id', itemId)
-                        .eq('claimed_by', currentUserId);
-                    // Reload
-                    await loadShoppingList();
-                    alert('✓ Item unclaimed');
-                }
-            }
+          return `
+            <div class="friend-section">
+              <div class="friend-section-header">
+                <div class="friend-section-title">
+                  <div class="friend-avatar-small">${escapeHtml((section.name||'F')[0].toUpperCase())}</div>
+                  <h3>For ${escapeHtml(section.name)}</h3>
+                </div>
+                <div class="section-total">${getCurrencySymbol()}${computeSectionTotal(section).toFixed(2)}</div>
+              </div>
 
-            function viewWishlist(username) {
-                window.location.href = `view-wishlist.html?friend=${encodeURIComponent(username)}`;
-            }
+              <div class="items-list">
+                ${plannedHtml}
+                ${claimedHtml}
+              </div>
+            </div>
+          `;
+        }).join('');
 
-            function toggleSidebar() {
-                document.getElementById('sidebar').classList.toggle('active');
-            }
+        container.innerHTML = html;
+      }
 
-            async function logout() {
-                if (confirm('Are you sure you want to logout?')) {
-                    await supabase.auth.signOut();
-                    window.location.href = 'login.html';
-                }
-            }
+      // compute totals
+      function computeSectionTotal(section){
+        let total = 0;
+        section.items.planned.forEach(p => total += Number(p.itemPrice || 0));
+        section.items.claimed.forEach(c => total += Number(c.itemPrice || 0));
+        return total;
+      }
 
-            // Close sidebar when clicking outside on mobile
-            document.addEventListener('click', function(e) {
-                const sidebar = document.getElementById('sidebar');
-                const menuBtn = document.querySelector('.mobile-menu-btn');
-                if (window.innerWidth <= 768) {
-                    if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                        sidebar.classList.remove('active');
-                    }
-                }
-            });
-        </script>
+      function updateBudgetCard(){
+        const plannedTotal = plannedGifts.reduce((s,i)=>s+Number(i.price||0),0);
+        const claimedTotal = claimedItems.reduce((s,i)=>s+Number(i.itemPrice||0),0);
+        const totalSpend = plannedTotal + claimedTotal;
+        const totalItems = plannedGifts.length + claimedItems.length;
+        const purchasedItems = plannedGifts.filter(p=>p.purchased).length + claimedItems.filter(c=>c.purchased).length;
+        const remainingItems = totalItems - purchasedItems;
+        document.getElementById('totalSpend').textContent = `${getCurrencySymbol()}${totalSpend.toFixed(2)}`;
+        document.getElementById('totalItemsCount').textContent = totalItems;
+        document.getElementById('purchasedCount').textContent = purchasedItems;
+        document.getElementById('remainingCount').textContent = remainingItems;
+      }
+
+      function getCurrencySymbol(){
+        return currentProfile?.currency === 'USD' ? '$'
+          : currentProfile?.currency === 'EUR' ? '€'
+          : currentProfile?.currency === 'NOK' ? 'kr '
+          : currentProfile?.currency === 'SEK' ? 'kr '
+          : currentProfile?.currency === 'DKK' ? 'kr '
+          : '£';
+      }
+
+      // Modal flows
+      function openPlanGiftModalFromPage(){ openPlanGiftModal({}); }
+
+      function openPlanGiftModal(options = {}) {
+        // Reset edit id
+        document.getElementById('planEditId').value = '';
+
+        // clear UI
+        document.getElementById('planFriendSelect').value = '';
+        document.getElementById('planFriendOther').style.display = 'none';
+        document.getElementById('planFriendName').value = options.friendName || '';
+        document.getElementById('planItemName').value = options.itemName || '';
+        document.getElementById('planPrice').value = options.price || '';
+        document.getElementById('planLink').value = options.link || '';
+        document.getElementById('planNote').value = options.note || '';
+
+        if (options.friendUserId || options.friendName) {
+          window.__planPrefill = { friendUserId: options.friendUserId || null, friendName: options.friendName || null };
+        } else {
+          window.__planPrefill = null;
+        }
+
+        // ensure select is populated (populatePlanFriendSelect will handle __planPrefill)
+        populatePlanFriendSelect().then(()=> {
+          document.getElementById('planGiftModal').classList.add('active');
+          document.getElementById('planGiftModal').setAttribute('aria-hidden','false');
+          document.getElementById('planItemName').focus();
+        });
+      }
+
+      function closePlanGiftModal(){
+        document.getElementById('planGiftModal').classList.remove('active');
+        document.getElementById('planGiftModal').setAttribute('aria-hidden','true');
+        // clear edit marker
+        document.getElementById('planEditId').value = '';
+      }
+
+      // Check URL params for prefill (from wishlist-view)
+      function checkPlanPrefillFromUrl(){
+        const params = new URLSearchParams(window.location.search);
+        const friendId = params.get('plan_friend_id');
+        const friendName = params.get('plan_friend_name');
+        if (friendId || friendName) {
+          window.__planPrefill = { friendUserId: friendId || null, friendName: friendName || null };
+          populatePlanFriendSelect().then(()=> {
+            openPlanGiftModal(window.__planPrefill);
+            // remove params from URL
+            const url = new URL(window.location);
+            url.searchParams.delete('plan_friend_id'); url.searchParams.delete('plan_friend_name');
+            window.history.replaceState({}, '', url.toString());
+          });
+        }
+      }
+
+      // Submit handler: supports create and update (edit)
+      document.getElementById('planGiftForm').addEventListener('submit', async function(e){
+        e.preventDefault();
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) { alert('Please sign in'); window.location.href='login.html'; return; }
+
+          const selectEl = document.getElementById('planFriendSelect');
+          const selectedOpt = selectEl.selectedOptions[0];
+          const selectedVal = selectEl.value;
+          let friendUserId = null;
+          let friendName = null;
+
+          if (selectedVal && selectedVal !== 'other') {
+            friendUserId = selectedVal;
+            friendName = selectedOpt.dataset.displayName || selectedOpt.dataset.username || selectedOpt.textContent;
+          } else {
+            friendName = document.getElementById('planFriendName').value.trim() || null;
+          }
+
+          const payload = {
+            created_by: user.id,
+            friend_user_id: friendUserId,
+            friend_name: friendName,
+            item_name: document.getElementById('planItemName').value.trim(),
+            price: document.getElementById('planPrice').value ? Number(document.getElementById('planPrice').value) : null,
+            link: document.getElementById('planLink').value.trim() || null,
+            note: document.getElementById('planNote').value.trim() || null
+          };
+
+          const editId = document.getElementById('planEditId').value;
+          if (editId) {
+            // update
+            const { error } = await supabase
+              .from('shopping_list_items')
+              .update(payload)
+              .eq('id', editId)
+              .eq('created_by', currentUserId);
+            if (error) throw error;
+          } else {
+            // insert
+            const { error } = await supabase
+              .from('shopping_list_items')
+              .insert([payload]);
+            if (error) throw error;
+          }
+
+          closePlanGiftModal();
+          await loadShoppingList();
+          alert('✓ Saved');
+        } catch (err) {
+          console.error(err);
+          alert('Error saving planned gift: ' + (err.message || err));
+        }
+      });
+
+      // Toggle planned purchased
+      async function togglePlannedPurchased(planId, purchased) {
+        try {
+          const { error } = await supabase
+            .from('shopping_list_items')
+            .update({ purchased })
+            .eq('id', planId)
+            .eq('created_by', currentUserId);
+          if (error) throw error;
+          await loadShoppingList();
+        } catch (err) {
+          console.error(err);
+          alert('Could not update planned gift');
+        }
+      }
+
+      // Delete planned gift
+      async function deletePlannedGift(planId) {
+        if (!confirm('Delete this planned gift?')) return;
+        try {
+          const { error } = await supabase
+            .from('shopping_list_items')
+            .delete()
+            .eq('id', planId)
+            .eq('created_by', currentUserId);
+          if (error) throw error;
+          await loadShoppingList();
+        } catch (err) {
+          console.error(err);
+          alert('Could not delete planned gift');
+        }
+      }
+
+      // Edit planned gift (pre-fill modal)
+      async function editPlannedGift(planId) {
+        const pg = plannedGifts.find(p => p.id === planId);
+        if (!pg) { alert('Not found'); return; }
+        document.getElementById('planEditId').value = pg.id;
+        window.__planPrefill = { friendUserId: pg.friend_user_id || null, friendName: pg.friend_name || null };
+        openPlanGiftModal({ itemName: pg.item_name, price: pg.price, link: pg.link, note: pg.note });
+      }
+
+      // Toggle claimed purchased (existing claims model)
+      async function togglePurchased(itemId, friendUsername) {
+        const claim = claimedItems.find(i => i.itemId === itemId);
+        if (!claim) return;
+        try {
+          const newPurchased = !claim.purchased;
+          const { error } = await supabase
+            .from('claims')
+            .update({ purchased: newPurchased })
+            .eq('item_id', itemId)
+            .eq('claimed_by', currentUserId);
+          if (error) throw error;
+          await loadShoppingList();
+        } catch (err) {
+          console.error(err);
+          alert('Error updating purchase status');
+        }
+      }
+
+      async function unclaimItem(itemId, friendUsername) {
+        const item = claimedItems.find(i => i.itemId === itemId);
+        if (!item) return;
+        if (!confirm(`Unclaim "${item.itemName}"?`)) return;
+        try {
+          const { error } = await supabase
+            .from('claims')
+            .delete()
+            .eq('item_id', itemId)
+            .eq('claimed_by', currentUserId);
+          if (error) throw error;
+          await loadShoppingList();
+          alert('✓ Item unclaimed');
+        } catch (err) {
+          console.error(err);
+          alert('Unable to unclaim');
+        }
+      }
+
+      // Utility: check URL params for prefill and open modal
+      function checkPlanPrefillFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const friendId = params.get('plan_friend_id');
+        const friendName = params.get('plan_friend_name');
+        if (friendId || friendName) {
+          window.__planPrefill = { friendUserId: friendId || null, friendName: friendName || null };
+          populatePlanFriendSelect().then(()=> {
+            openPlanGiftModal(window.__planPrefill);
+            const url = new URL(window.location);
+            url.searchParams.delete('plan_friend_id'); url.searchParams.delete('plan_friend_name');
+            window.history.replaceState({}, '', url.toString());
+          });
+        }
+      }
+
+      // Toggle sidebar mobile
+      function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+
+      // Logout
+      async function logout(){
+        if (!confirm('Logout?')) return;
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+      }
+    </script>
 </body>
 </html>

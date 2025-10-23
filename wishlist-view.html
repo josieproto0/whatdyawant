@@ -8,7 +8,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.5/dist/umd/supabase.min.js"></script>
     <script src="supabase.js"></script>
     <link rel="stylesheet" href="/assets/css/main.css">
-
+    <style>
+        /* Small page-specific tweaks (if needed) */
+        .plan-button-wrapper { margin-left: auto; align-self: flex-start; }
+        @media (max-width:768px) {
+            .plan-button-wrapper { margin-left: 0; margin-top: 8px; width:100%; }
+            .plan-button-wrapper .btn { width:100%; }
+        }
+    </style>
 </head>
 <body>
     <!-- Mobile Menu Button -->
@@ -60,13 +67,20 @@
     <!-- Main Content -->
     <main class="main-content">
         <div class="page-header">
-            <div class="header-top">
+            <div class="header-top" style="display:flex;align-items:center;gap:12px;width:100%;">
                 <a href="friends-wishlists.html" class="back-btn">
                     ← Back to Friends' Lists
                 </a>
+
+                <!-- Plan a Gift button: global for this friend's wishlist (top-right) -->
+                <div class="plan-button-wrapper" style="margin-left:auto;">
+                    <button id="planGiftForFriendBtn" class="btn btn-primary" title="Plan a gift for this friend">
+                        💡 Plan a Gift
+                    </button>
+                </div>
             </div>
 
-            <div class="owner-info">
+            <div class="owner-info" style="margin-top:12px;">
                 <div class="owner-avatar" id="ownerAvatar">S</div>
                 <div class="owner-details">
                     <h2 id="ownerName">Sarah's Wishlist</h2>
@@ -217,7 +231,6 @@
             readViewFilterInputs();
         }
 
-        // Add these functions at top level, outside of any other function
         function renderGuestWishlist() {
             const grid = document.getElementById('wishlistGrid');
 
@@ -291,6 +304,20 @@
 
             // Attach filter handlers now that DOM controls are present
             attachViewFilterHandlers();
+
+            // Wire up Plan a Gift button (safe to add here so friendUserId is available)
+            const planBtn = document.getElementById('planGiftForFriendBtn');
+            if (planBtn) {
+              planBtn.addEventListener('click', function() {
+                // Use friendUserId if available, otherwise pass friend name
+                const nameText = document.getElementById('ownerName')?.textContent?.replace("'s Wishlist","").trim() || '';
+                const params = new URLSearchParams();
+                if (friendUserId) params.set('plan_friend_id', friendUserId);
+                if (nameText) params.set('plan_friend_name', nameText);
+                // Redirect to shopping-list; the shopping-list page will open modal prefilled
+                window.location.href = `shopping-list.html?${params.toString()}`;
+              });
+            }
 
             // 3. NOW check authentication
             const { data: { user } } = await supabase.auth.getUser();
@@ -557,16 +584,6 @@
                 window.location.href = 'login.html';
             }
         }
-
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
-            }
-        });
     </script>
 </body>
 </html>
