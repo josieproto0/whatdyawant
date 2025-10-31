@@ -4,14 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>My Shopping List - Whatdyawant?</title>
-    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.5/dist/umd/supabase.min.js"></script>
     <script src="supabase.js"></script>
-
-    <!-- Consolidated stylesheet -->
     <link rel="stylesheet" href="assets/css/main.css">
-
-    <!-- Page-specific fallback styles (you can move into main.css) -->
     <style>
       .planned-badge{display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(99,102,241,0.12);color:#4f46e5;font-size:12px;font-weight:600;margin-left:8px}
       .shopping-item.planned{background:linear-gradient(180deg,rgba(249,250,252,1),rgba(255,255,255,0.95));border:1px dashed rgba(99,102,241,0.12)}
@@ -19,13 +14,19 @@
       #planGiftModal .modal-content{max-width:640px;padding:20px}
       #planGiftModal .form-row{display:grid;grid-template-columns:1fr 140px;gap:12px}
       @media (max-width:720px){#planGiftModal .form-row{grid-template-columns:1fr}}
+      .friend-username { color:#6b7280; font-size:13px; margin-left:8px; font-weight:600; }
+      .friend-section { margin-bottom:20px; border-radius:8px; padding:12px; background:#fff; box-shadow:0 1px 0 rgba(0,0,0,0.04); }
+      .friend-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+      .friend-section-title { display:flex; align-items:center; gap:10px; }
+      .friend-avatar-small { width:36px; height:36px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-weight:700; color:#333; }
+      .items-list { display:flex; flex-direction:column; gap:8px; }
+      .item-info .item-meta .item-link { margin-left:8px; color:#2563eb; text-decoration:none; }
+      .item-actions .btn-unclaim { margin-right:8px; }
     </style>
 </head>
 <body>
-    <!-- Mobile Menu Button -->
     <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
 
-    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo">
@@ -35,18 +36,10 @@
         </div>
 
         <nav class="sidebar-nav">
-            <a href="dashboard.html" class="nav-item">
-                <span>🏠</span><span>Dashboard</span>
-            </a>
-            <a href="my-wishlist.html" class="nav-item">
-                <span>❤️</span><span>My Wishlist</span>
-            </a>
-            <a href="friends-wishlists.html" class="nav-item">
-                <span>👥</span><span>Friends' Wishlists</span>
-            </a>
-            <a href="shopping-list.html" class="nav-item active">
-                <span>🛍️</span><span>My Shopping List</span>
-            </a>
+            <a href="dashboard.html" class="nav-item"><span>🏠</span><span>Dashboard</span></a>
+            <a href="my-wishlist.html" class="nav-item"><span>❤️</span><span>My Wishlist</span></a>
+            <a href="friends-wishlists.html" class="nav-item"><span>👥</span><span>Friends' Wishlists</span></a>
+            <a href="shopping-list.html" class="nav-item active"><span>🛍️</span><span>My Shopping List</span></a>
         </nav>
 
         <div class="sidebar-footer">
@@ -64,45 +57,30 @@
         </div>
     </aside>
 
-    <!-- Main Content -->
     <main class="main-content">
         <div class="page-header" style="display:flex;align-items:flex-start;gap:16px;">
             <div style="flex:1">
               <h2>My Shopping List 🛍️</h2>
               <p>Track gifts you've claimed and the gift ideas you plan privately</p>
             </div>
-
-            <!-- Global "Plan a Gift" button -->
             <div style="align-self:flex-start;">
               <button id="openPlanGiftBtn" class="btn btn-primary" onclick="openPlanGiftModalFromPage()" title="Plan a gift for a friend">💡 Plan a Gift</button>
             </div>
         </div>
 
-        <!-- Budget Overview -->
         <div class="budget-card" id="budgetCard" style="display: none;">
             <h3>Budget Overview</h3>
             <div class="budget-amount" id="totalSpend">£0.00</div>
             <div class="budget-details">
-                <div class="budget-detail">
-                    <span class="budget-detail-label">Total Items</span>
-                    <span class="budget-detail-value" id="totalItemsCount">0</span>
-                </div>
-                <div class="budget-detail">
-                    <span class="budget-detail-label">Purchased</span>
-                    <span class="budget-detail-value" id="purchasedCount">0</span>
-                </div>
-                <div class="budget-detail">
-                    <span class="budget-detail-label">Remaining</span>
-                    <span class="budget-detail-value" id="remainingCount">0</span>
-                </div>
+                <div class="budget-detail"><span class="budget-detail-label">Total Items</span><span class="budget-detail-value" id="totalItemsCount">0</span></div>
+                <div class="budget-detail"><span class="budget-detail-label">Purchased</span><span class="budget-detail-value" id="purchasedCount">0</span></div>
+                <div class="budget-detail"><span class="budget-detail-label">Remaining</span><span class="budget-detail-value" id="remainingCount">0</span></div>
             </div>
         </div>
 
-        <!-- Shopping List Content -->
         <div id="shoppingListContainer"></div>
     </main>
 
-    <!-- Plan a Gift Modal -->
     <div id="planGiftModal" class="modal" aria-hidden="true">
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="planGiftTitle">
         <div class="modal-header">
@@ -163,183 +141,296 @@
       let plannedGifts = [];
       let currentUserId = null;
       let currentProfile = null;
+      let savedFriends = []; // saved_friends rows for current user
+      let profilesCache = {}; // map profile.id -> profile
 
-      // Helpers to escape
-      function escapeHtml(str){ if (!str) return ''; return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]); }
-      function escapeAttr(str){ if (!str) return ''; return String(str).replace(/"/g,'&quot;'); }
+      // Helpers
+      function escapeHtml(str){ if (str === undefined || str === null) return ''; return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[s]); }
+      function escapeAttr(str){ if (str === undefined || str === null) return ''; return String(str).replace(/"/g,'&quot;'); }
 
-      // Init
       window.addEventListener('DOMContentLoaded', async function() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { window.location.href = 'login.html'; return; }
         currentUserId = user.id;
 
-        // Load profile
         const { data: profile, error: pErr } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', currentUserId)
-          .single();
-        if (pErr || !profile) { alert("Couldn't load profile info."); return; }
-        currentProfile = profile;
-        document.getElementById('userName').textContent = profile.full_name || user.email.split('@')[0];
-        document.getElementById('userEmail').textContent = user.email;
-        document.getElementById('userAvatar').textContent = (profile.full_name || user.email)[0].toUpperCase();
+          .maybeSingle();
+        currentProfile = profile || null;
+        document.getElementById('userName').textContent = (profile && profile.full_name) ? profile.full_name : (user.email || 'User').split('@')[0];
+        document.getElementById('userEmail').textContent = user.email || '';
+        document.getElementById('userAvatar').textContent = (profile && profile.full_name ? profile.full_name[0] : (user.email ? user.email[0] : 'U')).toUpperCase();
 
-        // Populate friend select and load data
         await populatePlanFriendSelect();
         await loadShoppingList();
-
-        // Check if URL has prefill params from wishlist-view
         checkPlanPrefillFromUrl();
       });
 
-      // Populate saved friends into select with dataset metadata
+      // Populate saved friends (option values are either friend_user_id or "saved:<savedId>" placeholder)
       async function populatePlanFriendSelect() {
         const select = document.getElementById('planFriendSelect');
-        const otherOpt = document.createElement('option');
-        otherOpt.value = 'other';
-        otherOpt.textContent = 'Other (enter name)';
-
         select.innerHTML = '<option value="">-- Select a saved friend --</option>';
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { select.appendChild(otherOpt); return; }
+        const otherOpt = document.createElement('option'); otherOpt.value = 'other'; otherOpt.textContent = 'Other (enter name)';
 
         const { data, error } = await supabase
           .from('saved_friends')
-          .select('friend_user_id, friend_name, friend_username')
-          .eq('user_id', user.id);
+          .select('id, friend_user_id, friend_name, friend_username')
+          .eq('user_id', currentUserId)
+          .order('created_at', { ascending: true });
 
         if (error) { console.error('saved_friends load error', error); select.appendChild(otherOpt); return; }
 
-        data.forEach(f => {
+        savedFriends = data || [];
+
+        savedFriends.forEach(sf => {
           const opt = document.createElement('option');
-          opt.value = f.friend_user_id || '';
-          const label = f.friend_name ? `${f.friend_name}${f.friend_username ? ` (@${f.friend_username})` : ''}` : (f.friend_username ? `@${f.friend_username}` : f.friend_user_id);
+          // Prefer storing the real friend_user_id as value when present.
+          opt.value = sf.friend_user_id || `saved:${sf.id}`;
+          // friendly label
+          let label = sf.friend_name || '';
+          if (sf.friend_username) label = label ? `${label} (@${sf.friend_username})` : `@${sf.friend_username}`;
+          if (!label) label = sf.friend_user_id || (`Saved ${sf.id.slice(0,8)}`);
           opt.textContent = label;
-          if (f.friend_username) opt.dataset.username = f.friend_username;
-          if (f.friend_name) opt.dataset.displayName = f.friend_name;
+          // store saved_friends id/username/display for resolution
+          if (sf.friend_username) opt.dataset.username = sf.friend_username;
+          if (sf.friend_name) opt.dataset.displayName = sf.friend_name;
+          opt.dataset.savedId = sf.id;
           select.appendChild(opt);
         });
 
         select.appendChild(otherOpt);
-
-        // If a prefill was set (redirect flow), apply it
-        if (window.__planPrefill) {
-          const pref = window.__planPrefill;
-          if (pref.friendUserId) {
-            const found = Array.from(select.options).find(o => o.value === pref.friendUserId);
-            if (found) {
-              select.value = pref.friendUserId;
-              document.getElementById('planFriendOther').style.display = 'none';
-            } else {
-              select.value = 'other';
-              document.getElementById('planFriendOther').style.display = 'block';
-              document.getElementById('planFriendName').value = pref.friendName || '';
-            }
-          } else if (pref.friendName) {
-            select.value = 'other';
-            document.getElementById('planFriendOther').style.display = 'block';
-            document.getElementById('planFriendName').value = pref.friendName;
-          }
-          window.__planPrefill = null;
-        }
       }
 
       document.getElementById('planFriendSelect').addEventListener('change', function(){
-        if (this.value === 'other') {
-          document.getElementById('planFriendOther').style.display = 'block';
-        } else {
-          document.getElementById('planFriendOther').style.display = 'none';
-        }
+        document.getElementById('planFriendOther').style.display = (this.value === 'other') ? 'block' : 'none';
       });
 
-      // Load claims + planned gifts
-      async function loadShoppingList() {
-        // Claims
-        const { data: claims } = await supabase
-          .from('claims')
-          .select('item_id, friend_user_id, purchased')
-          .eq('claimed_by', currentUserId);
-        claimedItems = [];
+      // LOAD: claims + planned gifts and resolve identities
+     // Replace your existing loadShoppingList() with this function.
 
-        if (claims && claims.length) {
-          // get all item ids
-          const itemIds = claims.map(c => c.item_id).filter(Boolean);
-          const { data: items } = await supabase
-            .from('wishlist_items')
-            .select('id, name, price, link, user_id')
-            .in('id', itemIds || []);
-          // map friend profiles
-          const friendIds = claims.map(c => c.friend_user_id).filter(Boolean);
-          const { data: profiles } = friendIds.length ? await supabase
-            .from('profiles')
-            .select('id, username, full_name')
-            .in('id', friendIds) : { data: [] };
+async function loadShoppingList() {
+  // Refresh savedFriends (ensure latest)
+  // (populatePlanFriendSelect already loads savedFriends, but ensure we have it)
+  if (!savedFriends || !Array.isArray(savedFriends) || savedFriends.length === 0) {
+    const { data: sfData } = await supabase
+      .from('saved_friends')
+      .select('id, friend_user_id, friend_name, friend_username')
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: true });
+    savedFriends = sfData || [];
+  }
 
-          claims.forEach(claim => {
-            const itemData = items ? items.find(i => i.id === claim.item_id) : null;
-            const friendProfile = profiles ? profiles.find(p => p.id === claim.friend_user_id) : null;
-            claimedItems.push({
-              itemId: claim.item_id,
-              itemName: itemData?.name || 'Unknown',
-              itemPrice: itemData?.price || 0,
-              itemLink: itemData?.link || '',
-              friendUsername: friendProfile?.username || '',
-              friendName: friendProfile?.full_name || friendProfile?.username || '',
-              purchased: claim.purchased || false,
-              friendUserId: claim.friend_user_id
-            });
-          });
+  // 1) Load planned gifts
+  const { data: plannedData, error: plannedError } = await supabase
+    .from('shopping_list_items')
+    .select('*')
+    .eq('created_by', currentUserId)
+    .order('created_at', { ascending: false });
+
+  if (plannedError) {
+    console.error('planned load error', plannedError);
+    plannedGifts = [];
+  } else {
+    plannedGifts = plannedData || [];
+  }
+
+  // 2) Attempt to resolve friend_user_id for planned items using saved_friends (exact match),
+  //    or using saved_friends.friend_username -> profiles lookup if necessary.
+  for (const p of plannedGifts) {
+    // canonicalFriendId will be set later; start with stored friend_user_id if present
+    p.canonicalFriendId = p.friend_user_id || null;
+    // quick resolution from saved_friends by matching friend_name or friend_username
+    if (!p.canonicalFriendId && p.friend_name) {
+      const pn = String(p.friend_name).trim().toLowerCase();
+      const match = savedFriends.find(sf => {
+        const sn = sf.friend_name ? String(sf.friend_name).trim().toLowerCase() : '';
+        const su = sf.friend_username ? String(sf.friend_username).trim().toLowerCase() : '';
+        return (sn && pn === sn) || (su && pn === su);
+      });
+      if (match) {
+        if (match.friend_user_id) {
+          p.canonicalFriendId = match.friend_user_id;
+        } else if (match.friend_username) {
+          // We'll try to resolve via profile lookup later (after we fetch profiles)
+          p._resolvedFromSavedUsername = match.friend_username;
         }
-
-        // Planned gifts for current user
-        const { data: plannedData, error: plannedError } = await supabase
-          .from('shopping_list_items')
-          .select('*')
-          .eq('created_by', currentUserId)
-          .order('created_at', { ascending: false });
-
-        if (plannedError) { console.error('planned load', plannedError); plannedGifts = []; }
-        else plannedGifts = plannedData || [];
-
-        // render
-        renderShoppingList();
       }
+    }
+  }
 
-      // Render grouped by friend (planned first, then claimed)
+  // 3) Load claims and referenced wishlist_items. Build claimedItems.
+  const { data: claims } = await supabase
+    .from('claims')
+    .select('item_id, friend_user_id, purchased, claimed_by, id')
+    .eq('claimed_by', currentUserId);
+
+  const claimRows = claims || [];
+  claimedItems = [];
+
+  const itemIds = claimRows.map(c => c.item_id).filter(Boolean);
+  let wishlistItems = [];
+  if (itemIds.length) {
+    const { data: items } = await supabase
+      .from('wishlist_items')
+      .select('id, name, price, link, user_id')
+      .in('id', itemIds);
+    wishlistItems = items || [];
+  }
+
+  for (const c of claimRows) {
+    const item = wishlistItems.find(i => i.id === c.item_id) || null;
+    const resolvedFriendId = c.friend_user_id || (item ? item.user_id : null) || null;
+    claimedItems.push({
+      claimId: c.id,
+      itemId: c.item_id,
+      itemName: item?.name || 'Unknown',
+      itemPrice: item?.price || 0,
+      itemLink: item?.link || '',
+      purchased: c.purchased || false,
+      canonicalFriendId: resolvedFriendId
+    });
+  }
+
+  // 4) Collect all friend_user_ids we need to fetch profiles for:
+  //    from planned.canonicalFriendId, planned._resolvedFromSavedUsername, and claimed canonicalFriendId
+  const idsFromPlanned = plannedGifts.map(p => p.canonicalFriendId).filter(Boolean);
+  const idsFromClaims = claimedItems.map(c => c.canonicalFriendId).filter(Boolean);
+  const candidateUsernames = plannedGifts
+    .map(p => p._resolvedFromSavedUsername)
+    .filter(Boolean)
+    .map(s => String(s).trim().toLowerCase());
+
+  // We'll fetch profiles for all ids we have and also fetch any profiles that match candidateUsernames.
+  const uniqueIds = [...new Set([...idsFromPlanned, ...idsFromClaims])];
+
+  // Map: profile.id -> profile and username -> profile
+  profilesCache = {};
+  const profilesByUsername = {};
+
+  if (uniqueIds.length) {
+    const { data: profilesById } = await supabase
+      .from('profiles')
+      .select('id, username, full_name')
+      .in('id', uniqueIds);
+    (profilesById || []).forEach(p => {
+      profilesCache[p.id] = p;
+      if (p.username) profilesByUsername[String(p.username).trim().toLowerCase()] = p;
+    });
+  }
+
+  // Also resolve any candidateUsernames by fetching matching profiles by username in one query
+  const uniqCandidateUsernames = [...new Set(candidateUsernames)];
+  if (uniqCandidateUsernames.length) {
+    const { data: byUsername } = await supabase
+      .from('profiles')
+      .select('id, username, full_name')
+      .in('username', uniqCandidateUsernames.map(u => u)); // usernames are case-sensitive in DB; we intentionally pass as-is
+    (byUsername || []).forEach(p => {
+      profilesCache[p.id] = p;
+      if (p.username) profilesByUsername[String(p.username).trim().toLowerCase()] = p;
+    });
+  }
+
+  // 5) Finalize plannedGifts resolution: if planned still lacks canonicalFriendId but has _resolvedFromSavedUsername or friend_username,
+  //    try mapping via profilesByUsername. Also set display fields used in rendering.
+  plannedGifts = plannedGifts.map(p => {
+    // If we have a username candidate from saved_friends, try to look it up
+    if (!p.canonicalFriendId && p._resolvedFromSavedUsername) {
+      const candidate = profilesByUsername[String(p._resolvedFromSavedUsername).trim().toLowerCase()];
+      if (candidate && candidate.id) p.canonicalFriendId = candidate.id;
+    }
+    // If we still don't have canonicalFriendId but p.friend_name matches any known profile username or full_name, try that too
+    if (!p.canonicalFriendId && p.friend_name) {
+      const lowerName = String(p.friend_name).trim().toLowerCase();
+      // check profilesByUsername map
+      const byU = profilesByUsername[lowerName];
+      if (byU && byU.id) p.canonicalFriendId = byU.id;
+      // if not found in username map, check profilesCache values by comparing full_name (cheap loop)
+      if (!p.canonicalFriendId) {
+        for (const pid in profilesCache) {
+          const pf = profilesCache[pid];
+          if (pf && pf.full_name && String(pf.full_name).trim().toLowerCase() === lowerName) {
+            p.canonicalFriendId = pf.id;
+            break;
+          }
+        }
+      }
+    }
+
+    // Build displayName/displayUsername for UI
+    let displayUsername = null;
+    let displayName = p.friend_name || 'Other';
+    if (p.canonicalFriendId && profilesCache[p.canonicalFriendId]) {
+      const prof = profilesCache[p.canonicalFriendId];
+      displayUsername = prof.username || null;
+      displayName = prof.full_name || prof.username || displayName;
+    } else {
+      // if savedFriends had username for this planned row, show it
+      if (p.friend_username) displayUsername = p.friend_username;
+    }
+
+    return {
+      ...p,
+      canonicalFriendId: p.canonicalFriendId || null,
+      displayName,
+      displayUsername
+    };
+  });
+
+  // 6) Enrich claimedItems with profile info (ensure they have displayName/displayUsername)
+  claimedItems = claimedItems.map(c => {
+    const prof = c.canonicalFriendId ? profilesCache[c.canonicalFriendId] : null;
+    const friendName = prof ? (prof.full_name || prof.username) : (c.friendName || 'Friend') ;
+    const friendUsername = prof ? prof.username : '';
+    return {
+      ...c,
+      friendName,
+      friendUsername
+    };
+  });
+
+  // Debug: print each item's grouping key so we can see why duplicates occur
+  const debugRows = [];
+  plannedGifts.forEach(p => debugRows.push({ type: 'planned', id: p.id, canonical: p.canonicalFriendId, username: p.displayUsername, name: p.displayName }));
+  claimedItems.forEach(c => debugRows.push({ type: 'claimed', claimId: c.claimId, itemId: c.itemId, canonical: c.canonicalFriendId, username: c.friendUsername, name: c.friendName }));
+  console.log('grouping debug rows:', debugRows);
+
+  // Save back to global arrays and render
+  // Ensure global plannedGifts/claimedItems reflect canonicalFriendId fields
+  // (renderShoppingList will group by canonicalFriendId first)
+  window.plannedGifts = plannedGifts;
+  window.claimedItems = claimedItems;
+
+  renderShoppingList();
+}
+
+      // Render grouped by friend: key preference friend_user_id -> username -> name
       function renderShoppingList() {
         const container = document.getElementById('shoppingListContainer');
-
         if ((plannedGifts.length === 0) && (claimedItems.length === 0)) {
           document.getElementById('budgetCard').style.display = 'none';
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">🛍️</div>
-              <h3>Your shopping list is empty</h3>
-              <p>Start planning gifts or claim items from friends' wishlists to build your shopping list and track your budget!</p>
-              <a href="friends-wishlists.html" class="btn-primary">Browse Friends' Wishlists</a>
-            </div>`;
+          container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🛍️</div><h3>Your shopping list is empty</h3><p>Start planning gifts or claim items from friends' wishlists to build your shopping list and track your budget!</p><a href="friends-wishlists.html" class="btn-primary">Browse Friends' Wishlists</a></div>`;
           return;
         }
-
         document.getElementById('budgetCard').style.display = 'block';
         updateBudgetCard();
 
-        // Group
         const sections = {};
-        const keyFor = (userId, name, username) => userId ? `id:${userId}` : (username ? `u:${username}` : `n:${name || 'friend'}`);
+        const keyFor = (userId, username, name) => userId ? `id:${userId}` : (username ? `u:${username}` : `n:${name || 'friend'}`);
 
+        // claimed
         claimedItems.forEach(c => {
-          const key = keyFor(c.friendUserId, c.friendName, c.friendUsername);
-          if (!sections[key]) sections[key] = { name: c.friendName || 'Friend', username: c.friendUsername || '', items: { planned: [], claimed: [] } };
+          const key = keyFor(c.friendUserId, c.friendUsername, c.friendName);
+          if (!sections[key]) sections[key] = { name: c.friendName || 'Friend', username: c.friendUsername || '', id: c.friendUserId || null, items: { planned: [], claimed: [] } };
           sections[key].items.claimed.push(c);
         });
 
+        // planned
         plannedGifts.forEach(p => {
-          const key = keyFor(p.friend_user_id, p.friend_name, '');
-          if (!sections[key]) sections[key] = { name: p.friend_name || 'Friend', username: '', items: { planned: [], claimed: [] } };
+          const key = keyFor(p.resolvedFriendUserId, p.displayUsername || p.friend_username, p.displayName);
+          if (!sections[key]) sections[key] = { name: p.displayName || 'Friend', username: p.displayUsername || '', id: p.resolvedFriendUserId || null, items: { planned: [], claimed: [] } };
           sections[key].items.planned.push({
             planId: p.id,
             itemName: p.item_name,
@@ -347,8 +438,9 @@
             itemLink: p.link || '',
             note: p.note || '',
             purchased: p.purchased || false,
-            friendUserId: p.friend_user_id,
-            friendName: p.friend_name
+            friendUserId: p.resolvedFriendUserId,
+            friendName: p.displayName,
+            friendUsername: p.displayUsername || ''
           });
         });
 
@@ -356,54 +448,42 @@
         let html = Object.values(sections).map(section => {
           const plannedHtml = section.items.planned.map(p => `
             <div class="shopping-item planned" data-plan-id="${escapeHtml(p.planId)}">
-              <div class="item-checkbox">
-                <div class="checkbox-wrapper">
-                  <input type="checkbox" ${p.purchased ? 'checked' : ''} onchange="togglePlannedPurchased('${escapeHtml(p.planId)}', this.checked)">
-                </div>
-              </div>
-
+              <div class="item-checkbox"><div class="checkbox-wrapper"><input type="checkbox" ${p.purchased ? 'checked' : ''} onchange="togglePlannedPurchased('${escapeHtml(p.planId)}', this.checked)"></div></div>
               <div class="item-info">
                 <div class="item-name">${escapeHtml(p.itemName)} <span class="planned-badge">Planned</span></div>
                 <div class="item-meta">${p.note ? escapeHtml(p.note) + ' · ' : ''}${p.itemLink ? `<a href="${escapeAttr(p.itemLink)}" target="_blank" class="item-link">link</a>` : ''}</div>
               </div>
-
               <div class="item-price">${getCurrencySymbol()}${Number(p.itemPrice || 0).toFixed(2)}</div>
-
-              <div class="item-actions">
-                <button class="btn-unclaim" onclick="deletePlannedGift('${escapeHtml(p.planId)}')">Delete</button>
-                <button class="btn-mark" onclick="editPlannedGift('${escapeHtml(p.planId)}')">Edit</button>
-              </div>
+              <div class="item-actions"><button class="btn-unclaim" onclick="deletePlannedGift('${escapeHtml(p.planId)}')">Delete</button><button class="btn-mark" onclick="editPlannedGift('${escapeHtml(p.planId)}')">Edit</button></div>
             </div>
           `).join('');
 
           const claimedHtml = section.items.claimed.map(c => `
             <div class="shopping-item ${c.purchased ? 'purchased' : ''}" data-item-id="${escapeHtml(c.itemId)}">
-              <div class="item-checkbox"><div class="checkbox-wrapper"><input type="checkbox" ${c.purchased ? 'checked' : ''} onchange="togglePurchased('${escapeHtml(c.itemId)}','${encodeURIComponent(c.friendUsername)}')"></div></div>
+              <div class="item-checkbox"><div class="checkbox-wrapper"><input type="checkbox" ${c.purchased ? 'checked' : ''} onchange="togglePurchased('${escapeHtml(c.itemId)}')"></div></div>
               <div class="item-info">
                 <div class="item-name">${escapeHtml(c.itemName)}</div>
                 ${c.itemLink ? `<a href="${escapeAttr(c.itemLink)}" class="item-link" target="_blank">🔗 View on ${escapeHtml(section.name)}</a>` : ''}
               </div>
               <div class="item-price">${getCurrencySymbol()}${Number(c.itemPrice || 0).toFixed(2)}</div>
-              <div class="item-actions">
-                <button class="btn-unclaim" onclick="unclaimItem('${escapeHtml(c.itemId)}','${encodeURIComponent(c.friendUsername)}')">Unclaim</button>
-              </div>
+              <div class="item-actions"><button class="btn-unclaim" onclick="unclaimItem('${escapeHtml(c.itemId)}')">Unclaim</button></div>
             </div>
           `).join('');
 
+          const usernamePart = section.username ? `<span class="friend-username">@${escapeHtml(section.username)}</span>` : '';
           return `
-            <div class="friend-section">
+            <div class="friend-section" data-friend-id="${escapeHtml(section.id || '')}">
               <div class="friend-section-header">
                 <div class="friend-section-title">
                   <div class="friend-avatar-small">${escapeHtml((section.name||'F')[0].toUpperCase())}</div>
-                  <h3>For ${escapeHtml(section.name)}</h3>
+                  <div>
+                    <h3 style="margin:0">For ${escapeHtml(section.name)}</h3>
+                    <div style="display:flex;align-items:center;">${usernamePart}</div>
+                  </div>
                 </div>
                 <div class="section-total">${getCurrencySymbol()}${computeSectionTotal(section).toFixed(2)}</div>
               </div>
-
-              <div class="items-list">
-                ${plannedHtml}
-                ${claimedHtml}
-              </div>
+              <div class="items-list">${plannedHtml}${claimedHtml}</div>
             </div>
           `;
         }).join('');
@@ -411,14 +491,13 @@
         container.innerHTML = html;
       }
 
-      // compute totals
+      // Helpers for budget and currency
       function computeSectionTotal(section){
         let total = 0;
         section.items.planned.forEach(p => total += Number(p.itemPrice || 0));
         section.items.claimed.forEach(c => total += Number(c.itemPrice || 0));
         return total;
       }
-
       function updateBudgetCard(){
         const plannedTotal = plannedGifts.reduce((s,i)=>s+Number(i.price||0),0);
         const claimedTotal = claimedItems.reduce((s,i)=>s+Number(i.itemPrice||0),0);
@@ -431,24 +510,14 @@
         document.getElementById('purchasedCount').textContent = purchasedItems;
         document.getElementById('remainingCount').textContent = remainingItems;
       }
-
       function getCurrencySymbol(){
-        return currentProfile?.currency === 'USD' ? '$'
-          : currentProfile?.currency === 'EUR' ? '€'
-          : currentProfile?.currency === 'NOK' ? 'kr '
-          : currentProfile?.currency === 'SEK' ? 'kr '
-          : currentProfile?.currency === 'DKK' ? 'kr '
-          : '£';
+        return currentProfile?.currency === 'USD' ? '$' : currentProfile?.currency === 'EUR' ? '€' : '£';
       }
 
       // Modal flows
       function openPlanGiftModalFromPage(){ openPlanGiftModal({}); }
-
       function openPlanGiftModal(options = {}) {
-        // Reset edit id
         document.getElementById('planEditId').value = '';
-
-        // clear UI
         document.getElementById('planFriendSelect').value = '';
         document.getElementById('planFriendOther').style.display = 'none';
         document.getElementById('planFriendName').value = options.friendName || '';
@@ -456,46 +525,29 @@
         document.getElementById('planPrice').value = options.price || '';
         document.getElementById('planLink').value = options.link || '';
         document.getElementById('planNote').value = options.note || '';
-
-        if (options.friendUserId || options.friendName) {
-          window.__planPrefill = { friendUserId: options.friendUserId || null, friendName: options.friendName || null };
-        } else {
-          window.__planPrefill = null;
-        }
-
-        // ensure select is populated (populatePlanFriendSelect will handle __planPrefill)
+        if (options.friendUserId || options.friendName) window.__planPrefill = { friendUserId: options.friendUserId || null, friendName: options.friendName || null };
         populatePlanFriendSelect().then(()=> {
           document.getElementById('planGiftModal').classList.add('active');
           document.getElementById('planGiftModal').setAttribute('aria-hidden','false');
           document.getElementById('planItemName').focus();
         });
       }
-
       function closePlanGiftModal(){
         document.getElementById('planGiftModal').classList.remove('active');
         document.getElementById('planGiftModal').setAttribute('aria-hidden','true');
-        // clear edit marker
         document.getElementById('planEditId').value = '';
       }
-
-      // Check URL params for prefill (from wishlist-view)
       function checkPlanPrefillFromUrl(){
         const params = new URLSearchParams(window.location.search);
         const friendId = params.get('plan_friend_id');
         const friendName = params.get('plan_friend_name');
         if (friendId || friendName) {
           window.__planPrefill = { friendUserId: friendId || null, friendName: friendName || null };
-          populatePlanFriendSelect().then(()=> {
-            openPlanGiftModal(window.__planPrefill);
-            // remove params from URL
-            const url = new URL(window.location);
-            url.searchParams.delete('plan_friend_id'); url.searchParams.delete('plan_friend_name');
-            window.history.replaceState({}, '', url.toString());
-          });
+          populatePlanFriendSelect().then(()=> { openPlanGiftModal(window.__planPrefill); const url = new URL(window.location); url.searchParams.delete('plan_friend_id'); url.searchParams.delete('plan_friend_name'); window.history.replaceState({}, '', url.toString()); });
         }
       }
 
-      // Submit handler: supports create and update (edit)
+      // Submit handler (create/update planned gift) - this resolves friend_user_id whenever possible
       document.getElementById('planGiftForm').addEventListener('submit', async function(e){
         e.preventDefault();
         try {
@@ -503,15 +555,45 @@
           if (!user) { alert('Please sign in'); window.location.href='login.html'; return; }
 
           const selectEl = document.getElementById('planFriendSelect');
-          const selectedOpt = selectEl.selectedOptions[0];
           const selectedVal = selectEl.value;
+          const selectedOpt = selectEl.selectedOptions[0];
           let friendUserId = null;
           let friendName = null;
 
-          if (selectedVal && selectedVal !== 'other') {
+          // 1) If user selected a real friend_user_id (value looks like a uuid), use it
+          if (selectedVal && selectedVal !== 'other' && !selectedVal.startsWith('saved:')) {
             friendUserId = selectedVal;
             friendName = selectedOpt.dataset.displayName || selectedOpt.dataset.username || selectedOpt.textContent;
-          } else {
+          }
+          // 2) If the selection references a saved_friends row (placeholder), try to resolve it
+          else if (selectedVal && selectedVal.startsWith('saved:')) {
+            const savedId = selectedVal.split(':',2)[1];
+            const sf = savedFriends.find(s => s.id === savedId) || null;
+            if (sf) {
+              // prefer existing friend_user_id on saved_friends
+              if (sf.friend_user_id) {
+                friendUserId = sf.friend_user_id;
+                friendName = sf.friend_name || sf.friend_username || null;
+              } else if (sf.friend_username) {
+                // attempt to lookup profile by username
+                const { data: prof } = await supabase.from('profiles').select('id, username, full_name').eq('username', sf.friend_username).maybeSingle();
+                if (prof && prof.id) {
+                  friendUserId = prof.id;
+                  friendName = prof.full_name || prof.username;
+                } else {
+                  // fallback to saved friend display name
+                  friendName = sf.friend_name || sf.friend_username || null;
+                }
+              } else {
+                friendName = sf.friend_name || null;
+              }
+            } else {
+              // saved entry not found - fallback to user-entered "other" if provided
+              friendName = document.getElementById('planFriendName').value.trim() || null;
+            }
+          }
+          // 3) Explicit "Other" selected or nothing matched
+          else if (selectedVal === 'other' || !selectedVal) {
             friendName = document.getElementById('planFriendName').value.trim() || null;
           }
 
@@ -527,18 +609,10 @@
 
           const editId = document.getElementById('planEditId').value;
           if (editId) {
-            // update
-            const { error } = await supabase
-              .from('shopping_list_items')
-              .update(payload)
-              .eq('id', editId)
-              .eq('created_by', currentUserId);
+            const { error } = await supabase.from('shopping_list_items').update(payload).eq('id', editId).eq('created_by', currentUserId);
             if (error) throw error;
           } else {
-            // insert
-            const { error } = await supabase
-              .from('shopping_list_items')
-              .insert([payload]);
+            const { error } = await supabase.from('shopping_list_items').insert([payload]);
             if (error) throw error;
           }
 
@@ -551,111 +625,55 @@
         }
       });
 
-      // Toggle planned purchased
+      // Planned toggles / edit / delete
       async function togglePlannedPurchased(planId, purchased) {
         try {
-          const { error } = await supabase
-            .from('shopping_list_items')
-            .update({ purchased })
-            .eq('id', planId)
-            .eq('created_by', currentUserId);
+          const { error } = await supabase.from('shopping_list_items').update({ purchased }).eq('id', planId).eq('created_by', currentUserId);
           if (error) throw error;
           await loadShoppingList();
-        } catch (err) {
-          console.error(err);
-          alert('Could not update planned gift');
-        }
+        } catch (err) { console.error(err); alert('Could not update planned gift'); }
       }
-
-      // Delete planned gift
       async function deletePlannedGift(planId) {
         if (!confirm('Delete this planned gift?')) return;
         try {
-          const { error } = await supabase
-            .from('shopping_list_items')
-            .delete()
-            .eq('id', planId)
-            .eq('created_by', currentUserId);
+          const { error } = await supabase.from('shopping_list_items').delete().eq('id', planId).eq('created_by', currentUserId);
           if (error) throw error;
           await loadShoppingList();
-        } catch (err) {
-          console.error(err);
-          alert('Could not delete planned gift');
-        }
+        } catch (err) { console.error(err); alert('Could not delete planned gift'); }
       }
-
-      // Edit planned gift (pre-fill modal)
-      async function editPlannedGift(planId) {
+      function editPlannedGift(planId) {
         const pg = plannedGifts.find(p => p.id === planId);
         if (!pg) { alert('Not found'); return; }
         document.getElementById('planEditId').value = pg.id;
-        window.__planPrefill = { friendUserId: pg.friend_user_id || null, friendName: pg.friend_name || null };
+        window.__planPrefill = { friendUserId: pg.resolvedFriendUserId || null, friendName: pg.displayName || pg.friend_name || null };
         openPlanGiftModal({ itemName: pg.item_name, price: pg.price, link: pg.link, note: pg.note });
       }
 
-      // Toggle claimed purchased (existing claims model)
-      async function togglePurchased(itemId, friendUsername) {
+      // Claimed toggles / unclaim
+      async function togglePurchased(itemId) {
         const claim = claimedItems.find(i => i.itemId === itemId);
         if (!claim) return;
         try {
           const newPurchased = !claim.purchased;
-          const { error } = await supabase
-            .from('claims')
-            .update({ purchased: newPurchased })
-            .eq('item_id', itemId)
-            .eq('claimed_by', currentUserId);
+          const { error } = await supabase.from('claims').update({ purchased: newPurchased }).eq('item_id', itemId).eq('claimed_by', currentUserId);
           if (error) throw error;
           await loadShoppingList();
-        } catch (err) {
-          console.error(err);
-          alert('Error updating purchase status');
-        }
+        } catch (err) { console.error(err); alert('Error updating purchase status'); }
       }
-
-      async function unclaimItem(itemId, friendUsername) {
+      async function unclaimItem(itemId) {
         const item = claimedItems.find(i => i.itemId === itemId);
         if (!item) return;
         if (!confirm(`Unclaim "${item.itemName}"?`)) return;
         try {
-          const { error } = await supabase
-            .from('claims')
-            .delete()
-            .eq('item_id', itemId)
-            .eq('claimed_by', currentUserId);
+          const { error } = await supabase.from('claims').delete().eq('item_id', itemId).eq('claimed_by', currentUserId);
           if (error) throw error;
           await loadShoppingList();
           alert('✓ Item unclaimed');
-        } catch (err) {
-          console.error(err);
-          alert('Unable to unclaim');
-        }
+        } catch (err) { console.error(err); alert('Unable to unclaim'); }
       }
 
-      // Utility: check URL params for prefill and open modal
-      function checkPlanPrefillFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const friendId = params.get('plan_friend_id');
-        const friendName = params.get('plan_friend_name');
-        if (friendId || friendName) {
-          window.__planPrefill = { friendUserId: friendId || null, friendName: friendName || null };
-          populatePlanFriendSelect().then(()=> {
-            openPlanGiftModal(window.__planPrefill);
-            const url = new URL(window.location);
-            url.searchParams.delete('plan_friend_id'); url.searchParams.delete('plan_friend_name');
-            window.history.replaceState({}, '', url.toString());
-          });
-        }
-      }
-
-      // Toggle sidebar mobile
       function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
-
-      // Logout
-      async function logout(){
-        if (!confirm('Logout?')) return;
-        await supabase.auth.signOut();
-        window.location.href = 'login.html';
-      }
+      async function logout(){ if (!confirm('Logout?')) return; await supabase.auth.signOut(); window.location.href = 'login.html'; }
     </script>
 </body>
 </html>
