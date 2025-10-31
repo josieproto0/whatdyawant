@@ -11,7 +11,7 @@
 </head>
 <body>
     <!-- Mobile Menu Button -->
-    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+    <button class="mobile-menu-btn" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">☰</button>
 
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -154,11 +154,6 @@
             document.getElementById('shareLink').value = `https://josieproto0.github.io/whatdyawant/wishlist-view.html?friend=${username}`;
         });
 
-        // Toggle sidebar on mobile
-    function toggleSidebar() {  
-    document.getElementById('sidebar').classList.toggle('active');
-}
-
         // Copy share link
         function copyShareLink() {
             const shareLink = document.getElementById('shareLink');
@@ -180,18 +175,7 @@
                 window.location.href = 'login.html';
             }
         }
-
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(e) {
-            const sidebar = document.getElementById('sidebar');
-            const menuBtn = document.querySelector('.mobile-menu-btn');
-
-            if (window.innerWidth <= 768) {
-                if (!sidebar.contains(e.target) && !menuBtn.contains(e.target)) {
-                    sidebar.classList.remove('active');
-                }
-            }
-        });
         </script>
+    <script src="/assets/js/mobile-sidebar.js" defer></script>
 </body>
 </html>

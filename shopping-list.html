@@ -25,7 +25,7 @@
     </style>
 </head>
 <body>
-    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+    <button class="mobile-menu-btn" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">☰</button>
 
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -672,8 +672,8 @@ async function loadShoppingList() {
         } catch (err) { console.error(err); alert('Unable to unclaim'); }
       }
 
-      function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
       async function logout(){ if (!confirm('Logout?')) return; await supabase.auth.signOut(); window.location.href = 'login.html'; }
     </script>
+    <script src="/assets/js/mobile-sidebar.js" defer></script>
 </body>
 </html>
