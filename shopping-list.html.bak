@@ -674,6 +674,6 @@ async function loadShoppingList() {
 
       async function logout(){ if (!confirm('Logout?')) return; await supabase.auth.signOut(); window.location.href = 'login.html'; }
     </script>
-    <script src="assets/js/mobile-sidebar.js" defer></script>
+    <script src="/assets/js/mobile-sidebar.js" defer></script>
 </body>
 </html>
