@@ -581,6 +581,6 @@
             }
         }
     </script>
-    <script src="assets/js/mobile-sidebar.js" defer></script>
+    <script src="/assets/js/mobile-sidebar.js" defer></script>
 </body>
 </html>
